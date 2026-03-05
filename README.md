@@ -2,7 +2,7 @@
 
 React and Next.js SDK for WhaleTools storefronts. Provides a typed API client, React hooks for cart/auth/analytics, and Next.js server utilities -- everything needed to build a headless storefront against the Whale Gateway API.
 
-**v0.1.1** | [npm](https://www.npmjs.com/package/@neowhale/storefront)
+**v0.1.2** | [npm](https://www.npmjs.com/package/@neowhale/storefront)
 
 ---
 
