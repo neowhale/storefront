@@ -2,6 +2,7 @@
 
 import { useContext } from 'react'
 import { useStore } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import { WhaleContext } from '../context.js'
 import type { CartState, CartActions } from '../stores/cart-store.js'
 
@@ -15,7 +16,7 @@ export function useCart() {
   const ctx = useContext(WhaleContext)
   if (!ctx) throw new Error('useCart must be used within <WhaleProvider>')
 
-  return useStore(ctx.cartStore, (s) => ({
+  return useStore(ctx.cartStore, useShallow((s) => ({
     cartId: s.cartId,
     items: s.items,
     itemCount: s.itemCount,
@@ -36,7 +37,7 @@ export function useCart() {
     syncCart: s.syncCart,
     clearCart: s.clearCart,
     checkout: s.checkout,
-  }))
+  })))
 }
 
 /** Granular selector — only re-renders on count change */
