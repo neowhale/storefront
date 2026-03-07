@@ -62,10 +62,15 @@ export class MetaPixelProvider implements PixelProvider {
     const metaEvent = EVENT_MAP[event]
     if (!metaEvent) return
 
-    if (params && Object.keys(params).length > 0) {
-      w.fbq('track', metaEvent, params)
+    // Extract eventID for Meta dedup (fbq 4th arg), pass remaining as event params
+    const { eventID, ...rest } = params ?? {}
+    const hasParams = Object.keys(rest).length > 0
+    const options = eventID ? { eventID } : undefined
+
+    if (hasParams) {
+      w.fbq('track', metaEvent, rest, options)
     } else {
-      w.fbq('track', metaEvent)
+      w.fbq('track', metaEvent, {}, options)
     }
   }
 

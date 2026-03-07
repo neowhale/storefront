@@ -71,13 +71,20 @@ export function useAnalytics() {
     async (eventType: EventType, data: Record<string, unknown> = {}) => {
       if (!trackingEnabled) return
 
-      // Fire pixel events instantly (client-side)
-      pixelManager?.track(eventType, data)
+      // Generate shared event_id for Meta CAPI deduplication
+      const eventId = crypto.randomUUID()
 
-      // Then fire gateway event (server-side attribution)
+      // Fire pixel events instantly (client-side) with eventID for fbq dedup
+      pixelManager?.track(eventType, { ...data, eventID: eventId })
+
+      // Then fire gateway event (server-side attribution) with same event_id
       try {
         const sessionId = await getOrCreateSession()
-        await client.trackEvent({ session_id: sessionId, event_type: eventType, event_data: data })
+        await client.trackEvent({
+          session_id: sessionId,
+          event_type: eventType,
+          event_data: { ...data, event_id: eventId },
+        })
       } catch {
         // fire-and-forget
       }
