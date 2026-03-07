@@ -1,6 +1,6 @@
 {
   "name": "@neowhale/storefront",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "React/Next.js SDK for WhaleTools storefronts — cart, auth, analytics, and more",
   "type": "module",
   "main": "dist/index.js",
@@ -43,6 +43,10 @@
   ],
   "author": "WhaleTools <dev@whaletools.dev>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/floradistro/neowhale-storefront"
+  },
   "publishConfig": {
     "access": "public"
   },
