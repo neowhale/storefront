@@ -20,6 +20,7 @@ export { useCustomerOrders, useCustomerAnalytics } from './hooks/use-customer.js
 export { AnalyticsTracker } from './components/analytics-tracker.js'
 export { CartInitializer } from './components/cart-initializer.js'
 export { AuthInitializer } from './components/auth-initializer.js'
+export { PixelInitializer } from './components/pixel-initializer.js'
 
 // Store types (for consumers who need to create custom selectors)
 export type { CartState, CartActions, CartStore } from './stores/cart-store.js'

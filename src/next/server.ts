@@ -7,9 +7,9 @@ import type { Product, WhaleStorefrontConfig } from '../types.js'
  */
 export function createServerClient(config?: Partial<WhaleStorefrontConfig>): WhaleClient {
   return new WhaleClient({
-    storeId: config?.storeId || process.env.NEXT_PUBLIC_STORE_ID || '',
-    apiKey: config?.apiKey || process.env.NEXT_PUBLIC_API_KEY || '',
-    gatewayUrl: config?.gatewayUrl || process.env.NEXT_PUBLIC_API_URL || 'https://whale-gateway.fly.dev',
+    storeId: config?.storeId || process.env.NEXT_PUBLIC_STORE_ID || process.env.NEXT_PUBLIC_WHALE_STORE_ID || '',
+    apiKey: config?.apiKey || process.env.NEXT_PUBLIC_API_KEY || process.env.NEXT_PUBLIC_WHALE_API_KEY || '',
+    gatewayUrl: config?.gatewayUrl || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_WHALE_GATEWAY_URL || 'https://whale-gateway.fly.dev',
     proxyPath: config?.proxyPath,
   })
 }

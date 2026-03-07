@@ -1,15 +1,17 @@
 'use client'
 
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, useCallback, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { WhaleClient } from '../client.js'
 import type { WhaleStorefrontConfig, Product } from '../types.js'
+import type { PixelManager } from '../pixels/pixel-manager.js'
 import { WhaleContext, type WhaleContextValue } from './context.js'
 import { createCartStore } from './stores/cart-store.js'
 import { createAuthStore } from './stores/auth-store.js'
 import { AnalyticsTracker } from './components/analytics-tracker.js'
 import { CartInitializer } from './components/cart-initializer.js'
 import { AuthInitializer } from './components/auth-initializer.js'
+import { PixelInitializer } from './components/pixel-initializer.js'
 
 export interface WhaleProviderProps extends WhaleStorefrontConfig {
   children: ReactNode
@@ -31,6 +33,11 @@ export function WhaleProvider({
   debug,
 }: WhaleProviderProps) {
   const pathname = usePathname()
+  const [pixelManager, setPixelManager] = useState<PixelManager | null>(null)
+
+  const handlePixelReady = useCallback((manager: PixelManager) => {
+    setPixelManager(manager)
+  }, [])
 
   const ctx = useMemo<WhaleContextValue>(() => {
     const resolvedConfig = {
@@ -65,15 +72,16 @@ export function WhaleProvider({
       cartStore,
       authStore,
       products,
+      pixelManager: null,
     }
     // Only recreate when identity changes — storeId + apiKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, apiKey])
 
-  // Update products on the context when they change (e.g. re-fetched)
+  // Update products and pixelManager on the context when they change
   const value = useMemo<WhaleContextValue>(
-    () => ({ ...ctx, products }),
-    [ctx, products]
+    () => ({ ...ctx, products, pixelManager }),
+    [ctx, products, pixelManager]
   )
 
   return (
@@ -81,6 +89,7 @@ export function WhaleProvider({
       <AuthInitializer />
       <CartInitializer />
       <AnalyticsTracker pathname={pathname} />
+      <PixelInitializer onReady={handlePixelReady} />
       {children}
     </WhaleContext.Provider>
   )

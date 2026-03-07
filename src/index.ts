@@ -1,5 +1,6 @@
 // @neowhale/storefront — Core entry point (no React)
 export { WhaleClient } from './client.js'
+export { PixelManager } from './pixels/pixel-manager.js'
 export type {
   Product,
   PricingTier,
@@ -21,4 +22,6 @@ export type {
   ListResponse,
   WhaleStorefrontConfig,
   EventType,
+  PixelConfig,
+  StorefrontConfig,
 } from './types.js'

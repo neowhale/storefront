@@ -229,3 +229,6 @@ export type EventType =
   | 'purchase'
   | 'category_view'
   | 'search'
+
+// Re-export pixel types for consumers
+export type { PixelConfig, StorefrontConfig } from './pixels/types.js'

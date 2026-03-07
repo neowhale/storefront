@@ -15,7 +15,7 @@ export function useAnalytics() {
   const ctx = useContext(WhaleContext)
   if (!ctx) throw new Error('useAnalytics must be used within <WhaleProvider>')
 
-  const { client, config } = ctx
+  const { client, config, pixelManager } = ctx
   const sessionPromiseRef = useRef<Promise<string> | null>(null)
   const sessionKey = `${config.storagePrefix}${SESSION_KEY_SUFFIX}`
 
@@ -67,6 +67,10 @@ export function useAnalytics() {
 
   const track = useCallback(
     async (eventType: EventType, data: Record<string, unknown> = {}) => {
+      // Fire pixel events instantly (client-side)
+      pixelManager?.track(eventType, data)
+
+      // Then fire gateway event (server-side attribution)
       try {
         const sessionId = await getOrCreateSession()
         await client.trackEvent({ session_id: sessionId, event_type: eventType, event_data: data })
@@ -74,7 +78,7 @@ export function useAnalytics() {
         // fire-and-forget
       }
     },
-    [client, getOrCreateSession]
+    [client, getOrCreateSession, pixelManager]
   )
 
   const linkCustomer = useCallback(
