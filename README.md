@@ -1,8 +1,20 @@
-# @neowhale/storefront
+<p align="center">
+  <img src="whale-logo.png" alt="WhaleTools" width="80" />
+</p>
 
-React and Next.js SDK for WhaleTools storefronts. Provides a typed API client, React hooks for cart/auth/analytics, and Next.js server utilities -- everything needed to build a headless storefront against the Whale Gateway API.
+<h1 align="center">@neowhale/storefront</h1>
 
-**v0.1.2** | [npm](https://www.npmjs.com/package/@neowhale/storefront)
+<p align="center">
+  React and Next.js SDK for WhaleTools storefronts — cart, auth, analytics, and more.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@neowhale/storefront"><img src="https://img.shields.io/npm/v/@neowhale/storefront.svg" alt="npm version" /></a>
+  <a href="https://whaletools.dev/docs"><img src="https://img.shields.io/badge/docs-whaletools.dev-blue" alt="docs" /></a>
+  <a href="https://github.com/neowhale/storefront/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@neowhale/storefront" alt="license" /></a>
+</p>
+
+Provides a typed API client, React hooks for cart/auth/analytics, and Next.js server utilities -- everything needed to build a headless storefront against the Whale Gateway API.
 
 ---
 
