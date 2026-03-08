@@ -80,7 +80,8 @@ export class WhaleClient {
       try {
         const body = await res.json()
         if (body?.message) message = body.message
-        else if (body?.error) message = body.error
+        else if (typeof body?.error === 'string') message = body.error
+        else if (body?.error?.message) message = body.error.message
       } catch { /* ignore parse errors */ }
       const err = new Error(message) as Error & { status: number }
       err.status = res.status

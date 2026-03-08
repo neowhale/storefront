@@ -28,6 +28,11 @@ export function createAuthMiddleware(options: {
   return function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
 
+    // Never gate the login path itself — prevents redirect loops
+    if (pathname === loginPath || pathname.startsWith(`${loginPath}/`)) {
+      return NextResponse.next()
+    }
+
     // Check if this is a protected path
     const isProtected = protectedPaths.some(
       (p) => pathname === p || pathname.startsWith(`${p}/`)
