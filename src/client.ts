@@ -1,18 +1,32 @@
 import type {
   Cart,
   CartItem,
+  Category,
+  CategoryTreeNode,
+  CheckoutSession,
+  CouponValidation,
   Customer,
   CustomerAnalytics,
   ListResponse,
   Location,
+  LoyaltyAccount,
+  LoyaltyReward,
+  LoyaltyTransaction,
   Order,
   PaymentData,
   Product,
+  Recommendation,
+  Review,
+  ReviewSummary,
   SendCodeResponse,
+  ShippingMethod,
+  ShippingRate,
   StorefrontSession,
   VerifyCodeResponse,
   WhaleStorefrontConfig,
+  WishlistItem,
   EventType,
+  QRLandingData,
 } from './types.js'
 
 import type { StorefrontConfig } from './pixels/types.js'
@@ -249,6 +263,20 @@ export class WhaleClient {
     return this.request<StorefrontConfig>('/storefront/config')
   }
 
+  // -- QR Landing Page --
+
+  /** Fetch QR landing page data (public, no auth needed). */
+  async fetchQRLandingData(code: string): Promise<QRLandingData> {
+    // Public endpoint — hit gateway directly, no store prefix or API key
+    const url = `${this.gatewayUrl}/q/${encodeURIComponent(code)}/page`
+    const res = await fetch(url)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body?.error?.message ?? `QR landing fetch failed: ${res.status}`)
+    }
+    return res.json()
+  }
+
   // -- Analytics / Storefront Sessions --
 
   async createSession(params: { user_agent?: string; referrer?: string }): Promise<StorefrontSession> {
@@ -267,6 +295,228 @@ export class WhaleClient {
     }
     if (this._sessionToken) headers['Authorization'] = `Bearer ${this._sessionToken}`
     await resilientSend(url, params, headers)
+  }
+
+  // -- Checkout Sessions --
+
+  async createCheckoutSession(params: {
+    cart_id: string
+    customer_email?: string
+    shipping_address?: import('./types.js').Address
+    billing_address?: import('./types.js').Address
+    shipping_method_id?: string
+    coupon_code?: string
+  }): Promise<CheckoutSession> {
+    return this.request<CheckoutSession>('/storefront/checkout', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    })
+  }
+
+  async getCheckoutSession(sessionId: string): Promise<CheckoutSession> {
+    return this.request<CheckoutSession>(`/storefront/checkout/${sessionId}`)
+  }
+
+  async updateCheckoutSession(sessionId: string, params: {
+    customer_email?: string
+    shipping_address?: import('./types.js').Address
+    billing_address?: import('./types.js').Address
+    shipping_method_id?: string
+    coupon_code?: string
+  }): Promise<CheckoutSession> {
+    return this.request<CheckoutSession>(`/storefront/checkout/${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(params),
+    })
+  }
+
+  async completeCheckout(sessionId: string, payment?: PaymentData): Promise<Order> {
+    return this.request<Order>(`/storefront/checkout/${sessionId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(payment ? {
+        payment_method: payment.payment_method,
+        ...(payment.opaque_data && { opaque_data: payment.opaque_data }),
+        ...(payment.billTo && { bill_to: payment.billTo }),
+        ...(payment.shipTo && { ship_to: payment.shipTo }),
+      } : {}),
+    })
+  }
+
+  // -- Search --
+
+  async searchProducts(params: {
+    query: string
+    category_id?: string
+    min_price?: number
+    max_price?: number
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+    limit?: number
+    starting_after?: string
+  }): Promise<ListResponse<Product>> {
+    const sp = new URLSearchParams({ q: params.query })
+    if (params.category_id) sp.set('category_id', params.category_id)
+    if (params.min_price !== undefined) sp.set('min_price', String(params.min_price))
+    if (params.max_price !== undefined) sp.set('max_price', String(params.max_price))
+    if (params.sort_by) sp.set('sort_by', params.sort_by)
+    if (params.sort_order) sp.set('sort_order', params.sort_order)
+    if (params.limit) sp.set('limit', String(params.limit))
+    if (params.starting_after) sp.set('starting_after', params.starting_after)
+    return this.request<ListResponse<Product>>(`/products/search?${sp}`)
+  }
+
+  // -- Categories --
+
+  async listCategories(): Promise<ListResponse<Category>> {
+    return this.request<ListResponse<Category>>('/categories')
+  }
+
+  async getCategory(id: string): Promise<Category> {
+    return this.request<Category>(`/categories/${id}`)
+  }
+
+  // -- Loyalty --
+
+  async getLoyaltyAccount(customerId: string): Promise<LoyaltyAccount> {
+    return this.request<LoyaltyAccount>(`/storefront/loyalty/${customerId}`)
+  }
+
+  async listLoyaltyRewards(): Promise<ListResponse<LoyaltyReward>> {
+    return this.request<ListResponse<LoyaltyReward>>('/storefront/loyalty/rewards')
+  }
+
+  async listLoyaltyTransactions(customerId: string, params?: {
+    limit?: number
+    starting_after?: string
+  }): Promise<ListResponse<LoyaltyTransaction>> {
+    const sp = new URLSearchParams()
+    if (params?.limit) sp.set('limit', String(params.limit))
+    if (params?.starting_after) sp.set('starting_after', params.starting_after)
+    const qs = sp.toString()
+    return this.request<ListResponse<LoyaltyTransaction>>(
+      `/storefront/loyalty/${customerId}/transactions${qs ? `?${qs}` : ''}`
+    )
+  }
+
+  async redeemLoyaltyReward(customerId: string, rewardId: string): Promise<{ success: boolean; points_remaining: number }> {
+    return this.request<{ success: boolean; points_remaining: number }>(
+      `/storefront/loyalty/${customerId}/redeem`,
+      { method: 'POST', body: JSON.stringify({ reward_id: rewardId }) }
+    )
+  }
+
+  // -- Reviews --
+
+  async listProductReviews(productId: string, params?: {
+    limit?: number
+    starting_after?: string
+    sort_by?: 'created_at' | 'rating'
+    sort_order?: 'asc' | 'desc'
+  }): Promise<ListResponse<Review> & { summary?: ReviewSummary }> {
+    const sp = new URLSearchParams()
+    if (params?.limit) sp.set('limit', String(params.limit))
+    if (params?.starting_after) sp.set('starting_after', params.starting_after)
+    if (params?.sort_by) sp.set('sort_by', params.sort_by)
+    if (params?.sort_order) sp.set('sort_order', params.sort_order)
+    const qs = sp.toString()
+    return this.request<ListResponse<Review> & { summary?: ReviewSummary }>(
+      `/products/${productId}/reviews${qs ? `?${qs}` : ''}`
+    )
+  }
+
+  async submitReview(productId: string, data: {
+    rating: number
+    title?: string
+    body?: string
+    customer_name?: string
+  }): Promise<Review> {
+    return this.request<Review>(`/products/${productId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  // -- Wishlist --
+
+  async listWishlistItems(customerId: string): Promise<ListResponse<WishlistItem>> {
+    return this.request<ListResponse<WishlistItem>>(`/storefront/wishlist/${customerId}`)
+  }
+
+  async addWishlistItem(customerId: string, productId: string): Promise<WishlistItem> {
+    return this.request<WishlistItem>(`/storefront/wishlist/${customerId}`, {
+      method: 'POST',
+      body: JSON.stringify({ product_id: productId }),
+    })
+  }
+
+  async removeWishlistItem(customerId: string, productId: string): Promise<void> {
+    return this.request<void>(`/storefront/wishlist/${customerId}/${productId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // -- Recommendations --
+
+  async getRecommendations(params?: {
+    product_id?: string
+    customer_id?: string
+    limit?: number
+    type?: 'similar' | 'frequently_bought_together' | 'personalized'
+  }): Promise<{ data: Recommendation[] }> {
+    const sp = new URLSearchParams()
+    if (params?.product_id) sp.set('product_id', params.product_id)
+    if (params?.customer_id) sp.set('customer_id', params.customer_id)
+    if (params?.limit) sp.set('limit', String(params.limit))
+    if (params?.type) sp.set('type', params.type)
+    const qs = sp.toString()
+    return this.request<{ data: Recommendation[] }>(
+      `/storefront/recommendations${qs ? `?${qs}` : ''}`
+    )
+  }
+
+  // -- Locations (extended) --
+
+  async getLocation(id: string): Promise<Location> {
+    return this.request<Location>(`/locations/${id}`)
+  }
+
+  // -- Shipping --
+
+  async listShippingMethods(): Promise<ListResponse<ShippingMethod>> {
+    return this.request<ListResponse<ShippingMethod>>('/storefront/shipping/methods')
+  }
+
+  async calculateShippingRates(params: {
+    cart_id: string
+    shipping_address: import('./types.js').Address
+  }): Promise<{ data: ShippingRate[] }> {
+    return this.request<{ data: ShippingRate[] }>('/storefront/shipping/rates', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    })
+  }
+
+  // -- Coupons --
+
+  async validateCoupon(code: string, params?: {
+    cart_id?: string
+  }): Promise<CouponValidation> {
+    const sp = new URLSearchParams({ code })
+    if (params?.cart_id) sp.set('cart_id', params.cart_id)
+    return this.request<CouponValidation>(`/storefront/coupons/validate?${sp}`)
+  }
+
+  async applyCoupon(cartId: string, code: string): Promise<Cart> {
+    return this.request<Cart>(`/cart/${cartId}/coupon`, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+  }
+
+  async removeCoupon(cartId: string): Promise<Cart> {
+    return this.request<Cart>(`/cart/${cartId}/coupon`, {
+      method: 'DELETE',
+    })
   }
 
   // -- Static Media Utilities --

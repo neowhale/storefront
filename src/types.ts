@@ -40,6 +40,118 @@ export interface Category {
   id: string
   name: string
   slug: string
+  parent_id: string | null
+  description: string | null
+  image_url: string | null
+  sort_order: number
+  product_count?: number
+}
+
+export interface CategoryTreeNode extends Category {
+  children: CategoryTreeNode[]
+}
+
+export interface Review {
+  id: string
+  product_id: string
+  customer_id: string | null
+  customer_name: string | null
+  rating: number
+  title: string | null
+  body: string | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ReviewSummary {
+  average_rating: number
+  total_reviews: number
+  rating_distribution: Record<string, number>
+}
+
+export interface WishlistItem {
+  id: string
+  product_id: string
+  product: Product | null
+  added_at: string
+}
+
+export interface LoyaltyAccount {
+  customer_id: string
+  points_balance: number
+  tier: string
+  lifetime_points: number
+}
+
+export interface LoyaltyReward {
+  id: string
+  name: string
+  description: string | null
+  points_cost: number
+  reward_type: string
+  is_active: boolean
+}
+
+export interface LoyaltyTransaction {
+  id: string
+  customer_id: string
+  points: number
+  type: string
+  description: string | null
+  created_at: string
+  order_id: string | null
+}
+
+export interface ShippingMethod {
+  id: string
+  name: string
+  description: string | null
+  carrier: string | null
+  estimated_days_min: number | null
+  estimated_days_max: number | null
+  is_active: boolean
+}
+
+export interface ShippingRate {
+  method_id: string
+  method_name: string
+  carrier: string | null
+  rate: number
+  estimated_days_min: number | null
+  estimated_days_max: number | null
+}
+
+export interface CouponValidation {
+  valid: boolean
+  code: string
+  discount_type: string | null
+  discount_value: number | null
+  message: string | null
+}
+
+export interface CheckoutSession {
+  id: string
+  cart_id: string
+  status: string
+  customer_email: string | null
+  shipping_address: Address | null
+  billing_address: Address | null
+  shipping_method_id: string | null
+  coupon_code: string | null
+  subtotal: number
+  tax_amount: number
+  shipping_amount: number
+  discount_amount: number
+  total: number
+  created_at: string
+  expires_at: string
+}
+
+export interface Recommendation {
+  product: Product
+  score: number
+  reason: string
 }
 
 export interface CartItem {
@@ -241,6 +353,51 @@ export type EventType =
   | 'purchase'
   | 'category_view'
   | 'search'
+
+// -- QR Landing Page --
+
+export interface QRLandingPage {
+  title: string | null
+  description: string | null
+  image_url: string | null
+  cta_text: string | null
+  cta_url: string | null
+  background_color: string | null
+  text_color: string | null
+  layout: string | null
+  theme: string | null
+  video_url: string | null
+  gallery_urls: string[] | null
+}
+
+export interface QRLandingStore {
+  id: string
+  name: string
+  logo_url: string | null
+  banner_url: string | null
+  tagline: string | null
+  brand_colors: Record<string, string> | null
+  theme: Record<string, unknown> | null
+}
+
+export interface QRLandingData {
+  object: 'qr_landing_page'
+  qr_code: {
+    id: string
+    code: string
+    name: string
+    type: string
+    destination_url: string
+    landing_page: QRLandingPage
+    brand_color: string | null
+    logo_url: string | null
+    campaign_name: string | null
+    tags: string[] | null
+  }
+  store: QRLandingStore | null
+  product: Record<string, unknown> | null
+  coa: { url: string; document_name: string } | null
+}
 
 // Re-export pixel types for consumers
 export type { PixelConfig, StorefrontConfig } from './pixels/types.js'
