@@ -123,18 +123,19 @@ function DefaultLayout({
   const surface = store?.theme?.surface as string || '#111'
   const muted = store?.theme?.muted as string || '#888'
   const logoUrl = qr.logo_url || store?.logo_url
-  const productImage = lp.image_url || (product?.images as string[])?.[0] || null
+  const productImage = lp.image_url || (product?.featured_image as string) || (product?.image_gallery as string[])?.[0] || null
   const productName = lp.title || (product?.name as string) || qr.name
   const description = lp.description || (product?.description as string) || ''
   const ctaText = lp.cta_text || (coa ? 'View Lab Results' : 'Learn More')
   const ctaUrl = lp.cta_url || qr.destination_url
 
-  // Cannabinoid data
-  const thca = product?.thca_percentage as number | null
-  const thc = product?.thc_percentage as number | null
-  const cbd = product?.cbd_percentage as number | null
-  const strainType = product?.strain_type as string | null
-  const categoryName = product?.category_name as string | null
+  // Cannabinoid data from custom_fields
+  const cf = product?.custom_fields as Record<string, unknown> | null | undefined
+  const thca = (cf?.thca_percentage as number) ?? null
+  const thc = (cf?.d9_percentage as number) ?? null
+  const cbd = (cf?.cbd_total as number) ?? null
+  const strainType = (cf?.strain_type as string) ?? null
+  const categoryName = (product?.category_name as string) ?? null
 
   const handleCOAClick = useCallback(() => {
     if (coa) setShowCOA(true)
