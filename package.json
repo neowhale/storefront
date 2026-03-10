@@ -56,17 +56,22 @@
     "access": "public"
   },
   "peerDependencies": {
+    "@neowhale/ui": ">=0.1.0",
     "next": ">=14.0.0",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
     "zustand": ">=5.0.0"
   },
   "peerDependenciesMeta": {
+    "@neowhale/ui": {
+      "optional": true
+    },
     "next": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@neowhale/ui": "file:../neowhale-ui",
     "@playwright/test": "^1.58.2",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",

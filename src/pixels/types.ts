@@ -13,4 +13,5 @@ export interface PixelConfig {
 export interface StorefrontConfig {
   object: 'storefront_config'
   pixels: PixelConfig[]
+  theme?: Record<string, unknown>
 }

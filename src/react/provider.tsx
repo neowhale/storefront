@@ -12,6 +12,7 @@ import { AnalyticsTracker } from './components/analytics-tracker.js'
 import { CartInitializer } from './components/cart-initializer.js'
 import { AuthInitializer } from './components/auth-initializer.js'
 import { PixelInitializer } from './components/pixel-initializer.js'
+import { ThemeProvider, type ThemeTokens } from '@neowhale/ui'
 
 /** Read a boolean env var (NEXT_PUBLIC_*). Returns undefined when absent. */
 function envBool(name: string): boolean | undefined {
@@ -34,11 +35,14 @@ export interface WhaleProviderProps extends WhaleStorefrontConfig {
   children: ReactNode
   /** Server-fetched products passed to client for hooks */
   products?: Product[]
+  /** Manual theme overrides — merged with store theme fetched from storefront config */
+  theme?: Partial<ThemeTokens>
 }
 
 export function WhaleProvider({
   children,
   products = [],
+  theme: themeProp,
   storeId,
   apiKey,
   gatewayUrl,
@@ -53,9 +57,14 @@ export function WhaleProvider({
 }: WhaleProviderProps) {
   const pathname = usePathname()
   const [pixelManager, setPixelManager] = useState<PixelManager | null>(null)
+  const [storeTheme, setStoreTheme] = useState<Partial<ThemeTokens> | undefined>(undefined)
 
   const handlePixelReady = useCallback((manager: PixelManager) => {
     setPixelManager(manager)
+  }, [])
+
+  const handleTheme = useCallback((theme: Record<string, unknown>) => {
+    setStoreTheme(theme as Partial<ThemeTokens>)
   }, [])
 
   const ctx = useMemo<WhaleContextValue>(() => {
@@ -105,13 +114,21 @@ export function WhaleProvider({
     [ctx, products, pixelManager]
   )
 
+  // Merge store-fetched theme with manual overrides (manual takes precedence)
+  const mergedTheme = useMemo<Partial<ThemeTokens> | undefined>(() => {
+    if (!storeTheme && !themeProp) return undefined
+    return { ...storeTheme, ...themeProp }
+  }, [storeTheme, themeProp])
+
   return (
     <WhaleContext.Provider value={value}>
-      <AuthInitializer />
-      <CartInitializer />
-      <AnalyticsTracker pathname={pathname} />
-      <PixelInitializer onReady={handlePixelReady} />
-      {children}
+      <ThemeProvider theme={mergedTheme}>
+        <AuthInitializer />
+        <CartInitializer />
+        <AnalyticsTracker pathname={pathname} />
+        <PixelInitializer onReady={handlePixelReady} onTheme={handleTheme} />
+        {children}
+      </ThemeProvider>
     </WhaleContext.Provider>
   )
 }
