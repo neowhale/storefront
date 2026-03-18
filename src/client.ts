@@ -4,7 +4,7 @@ import type {
   Category,
   CategoryTreeNode,
   CheckoutSession,
-  CouponValidation,
+  DealValidation,
   Customer,
   CustomerAnalytics,
   ListResponse,
@@ -16,6 +16,8 @@ import type {
   PaymentData,
   Product,
   Recommendation,
+  ReferralEnrollment,
+  ReferralStatus,
   Review,
   ReviewSummary,
   SendCodeResponse,
@@ -184,12 +186,13 @@ export class WhaleClient {
 
   // -- Checkout --
 
-  async checkout(cartId: string, customerEmail?: string, payment?: PaymentData): Promise<Order> {
+  async checkout(cartId: string, customerEmail?: string, payment?: PaymentData, referralCode?: string): Promise<Order> {
     return this.request<Order>('/checkout', {
       method: 'POST',
       body: JSON.stringify({
         cart_id: cartId,
         ...(customerEmail && { customer_email: customerEmail }),
+        ...(referralCode && { referral_code: referralCode }),
         ...(payment && {
           payment_method: payment.payment_method,
           ...(payment.opaque_data && { opaque_data: payment.opaque_data }),
@@ -212,6 +215,13 @@ export class WhaleClient {
 
   async createCustomer(data: { first_name: string; last_name: string; email: string; phone?: string }): Promise<Customer> {
     return this.request<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) })
+  }
+
+  async updateProfile(customerId: string, data: { first_name: string; last_name: string; phone?: string; date_of_birth?: string }): Promise<Customer> {
+    return this.request<Customer>('/storefront/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ customer_id: customerId, ...data }),
+    })
   }
 
   // -- Orders --
@@ -277,6 +287,17 @@ export class WhaleClient {
     return res.json()
   }
 
+  /** Fetch landing page data by slug (public, no auth needed). */
+  async fetchLandingPage(slug: string): Promise<import('./types.js').LandingPageRenderData> {
+    const url = `${this.gatewayUrl}/l/${encodeURIComponent(slug)}`
+    const res = await fetch(url)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body?.error?.message ?? `Landing page fetch failed: ${res.status}`)
+    }
+    return res.json()
+  }
+
   // -- Analytics / Storefront Sessions --
 
   async createSession(params: { user_agent?: string; referrer?: string }): Promise<StorefrontSession> {
@@ -306,6 +327,7 @@ export class WhaleClient {
     billing_address?: import('./types.js').Address
     shipping_method_id?: string
     coupon_code?: string
+    referral_code?: string
   }): Promise<CheckoutSession> {
     return this.request<CheckoutSession>('/storefront/checkout', {
       method: 'POST',
@@ -496,26 +518,64 @@ export class WhaleClient {
     })
   }
 
-  // -- Coupons --
+  // -- Deals (discount codes) --
 
-  async validateCoupon(code: string, params?: {
+  async validateDeal(code: string, params?: {
     cart_id?: string
-  }): Promise<CouponValidation> {
+  }): Promise<DealValidation> {
     const sp = new URLSearchParams({ code })
     if (params?.cart_id) sp.set('cart_id', params.cart_id)
-    return this.request<CouponValidation>(`/storefront/coupons/validate?${sp}`)
+    return this.request<DealValidation>(`/storefront/deals/validate?${sp}`)
   }
 
-  async applyCoupon(cartId: string, code: string): Promise<Cart> {
-    return this.request<Cart>(`/cart/${cartId}/coupon`, {
+  async applyDeal(cartId: string, code: string): Promise<Cart> {
+    return this.request<Cart>(`/cart/${cartId}/deal`, {
       method: 'POST',
       body: JSON.stringify({ code }),
     })
   }
 
-  async removeCoupon(cartId: string): Promise<Cart> {
-    return this.request<Cart>(`/cart/${cartId}/coupon`, {
+  async removeDeal(cartId: string): Promise<Cart> {
+    return this.request<Cart>(`/cart/${cartId}/deal`, {
       method: 'DELETE',
+    })
+  }
+
+  /** @deprecated Use validateDeal instead */
+  async validateCoupon(code: string, params?: { cart_id?: string }): Promise<DealValidation> {
+    return this.validateDeal(code, params)
+  }
+
+  /** @deprecated Use applyDeal instead */
+  async applyCoupon(cartId: string, code: string): Promise<Cart> {
+    return this.applyDeal(cartId, code)
+  }
+
+  /** @deprecated Use removeDeal instead */
+  async removeCoupon(cartId: string): Promise<Cart> {
+    return this.removeDeal(cartId)
+  }
+
+  // -- Referrals --
+
+  async enrollReferral(customerId: string): Promise<ReferralEnrollment> {
+    return this.request<ReferralEnrollment>('/storefront/referrals/enroll', {
+      method: 'POST',
+      body: JSON.stringify({ customer_id: customerId }),
+    })
+  }
+
+  async getReferralStatus(customerId: string): Promise<ReferralStatus> {
+    return this.request<ReferralStatus>(`/storefront/referrals/status?customer_id=${customerId}`)
+  }
+
+  async attributeReferral(
+    customerId: string,
+    referralCode: string,
+  ): Promise<{ success: boolean; affiliate_id?: string; error?: string }> {
+    return this.request('/storefront/referrals/attribute', {
+      method: 'POST',
+      body: JSON.stringify({ customer_id: customerId, referral_code: referralCode }),
     })
   }
 

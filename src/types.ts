@@ -122,13 +122,20 @@ export interface ShippingRate {
   estimated_days_max: number | null
 }
 
-export interface CouponValidation {
+export interface DealValidation {
   valid: boolean
   code: string
+  deal_id?: string
+  name?: string
   discount_type: string | null
   discount_value: number | null
+  apply_to?: string
+  badge_text?: string | null
   message: string | null
 }
+
+/** @deprecated Use DealValidation instead */
+export type CouponValidation = DealValidation
 
 export interface CheckoutSession {
   id: string
@@ -396,7 +403,74 @@ export interface QRLandingData {
   }
   store: QRLandingStore | null
   product: Record<string, unknown> | null
-  coa: { url: string; document_name: string } | null
+  coa: { url: string; viewer_url?: string | null; document_name: string } | null
+  landing_page: LandingPageConfig | null
+}
+
+// -- Landing Pages --
+
+export interface LandingSection {
+  id: string
+  type: 'hero' | 'text' | 'image' | 'video' | 'gallery' | 'cta' | 'stats' | 'product_card' | 'coa_viewer' | 'social_links' | 'divider' | 'custom'
+  content: Record<string, unknown>
+  order: number
+  config?: Record<string, unknown>
+}
+
+export interface LandingPageConfig {
+  id: string
+  slug: string
+  name: string
+  status: string
+  layout: string
+  theme: string
+  sections: LandingSection[]
+  background_color: string | null
+  text_color: string | null
+  accent_color: string | null
+  font_family: string | null
+  custom_css: string | null
+  page_title: string | null
+  og_title: string | null
+  og_description: string | null
+  og_image_url: string | null
+  total_views: number
+  unique_views: number
+}
+
+export interface LandingPageRenderData {
+  object: 'landing_page'
+  landing_page: LandingPageConfig
+  store: QRLandingStore | null
+  product: Record<string, unknown> | null
+  coa: { url: string; viewer_url?: string | null; document_name: string } | null
+}
+
+// -- Referral Program --
+
+export interface ReferralEnrollment {
+  object: 'referral_enrollment'
+  affiliate_id: string
+  referral_code: string
+  share_url: string
+  qr_code_id: string
+  wallet_pass_id: string
+}
+
+export interface ReferralStatus {
+  object: 'referral_status'
+  enrolled: boolean
+  referral_code: string | null
+  share_url: string | null
+  total_referrals: number
+  pending_referrals: number
+  points_earned: number
+  wallet_pass_id: string | null
+  referred_by: {
+    affiliate_id: string
+    referral_code: string
+    referrer_name: string
+  } | null
 }
 
 // Re-export pixel types for consumers

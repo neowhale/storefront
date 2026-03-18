@@ -2,21 +2,21 @@
 
 import { useContext, useState, useCallback } from 'react'
 import { WhaleContext } from '../context.js'
-import type { CouponValidation, Cart } from '../../types.js'
+import type { DealValidation, Cart } from '../../types.js'
 
-export function useCoupons() {
+export function useDeals() {
   const ctx = useContext(WhaleContext)
-  if (!ctx) throw new Error('useCoupons must be used within <WhaleProvider>')
+  if (!ctx) throw new Error('useDeals must be used within <WhaleProvider>')
 
-  const [validation, setValidation] = useState<CouponValidation | null>(null)
+  const [validation, setValidation] = useState<DealValidation | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
-  const validate = useCallback(async (code: string, cartId?: string): Promise<CouponValidation> => {
+  const validate = useCallback(async (code: string, cartId?: string): Promise<DealValidation> => {
     setLoading(true)
     setError(null)
     try {
-      const result = await ctx.client.validateCoupon(code, cartId ? { cart_id: cartId } : undefined)
+      const result = await ctx.client.validateDeal(code, cartId ? { cart_id: cartId } : undefined)
       setValidation(result)
       return result
     } catch (err) {
@@ -33,7 +33,7 @@ export function useCoupons() {
     setLoading(true)
     setError(null)
     try {
-      const cart = await ctx.client.applyCoupon(cartId, code)
+      const cart = await ctx.client.applyDeal(cartId, code)
       return cart
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err))
@@ -48,7 +48,7 @@ export function useCoupons() {
     setLoading(true)
     setError(null)
     try {
-      const cart = await ctx.client.removeCoupon(cartId)
+      const cart = await ctx.client.removeDeal(cartId)
       setValidation(null)
       return cart
     } catch (err) {
@@ -67,3 +67,6 @@ export function useCoupons() {
 
   return { validation, loading, error, validate, apply, remove, clear }
 }
+
+/** @deprecated Use useDeals instead */
+export const useCoupons = useDeals

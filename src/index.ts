@@ -32,6 +32,7 @@ export type {
   LoyaltyTransaction,
   ShippingMethod,
   ShippingRate,
+  DealValidation,
   CouponValidation,
   CheckoutSession,
   Recommendation,
@@ -40,4 +41,7 @@ export type {
   QRLandingData,
   QRLandingPage,
   QRLandingStore,
+  LandingSection,
+  LandingPageConfig,
+  LandingPageRenderData,
 } from './types.js'
