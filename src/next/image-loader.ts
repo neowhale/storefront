@@ -36,14 +36,17 @@ export function createImageLoader(config: {
   signingSecret: string
 }): (params: ImageLoaderParams) => string {
   return ({ src, width, quality }: ImageLoaderParams): string => {
-    if (!src.includes(config.supabaseHost)) {
-      return src
+    // Strip retry cache-bust params (_r=N) so retries hit the same gateway cache key
+    const cleanSrc = src.replace(/[?&]_r=\d+/, '')
+
+    if (!cleanSrc.includes(config.supabaseHost)) {
+      return cleanSrc
     }
 
     const w = String(snapWidth(width))
     const q = String(quality || 80)
     const f = 'webp'
-    const encoded = WhaleClient.encodeBase64Url(src)
+    const encoded = WhaleClient.encodeBase64Url(cleanSrc)
     const s = WhaleClient.signMedia(config.signingSecret, encoded, w, q, f)
 
     return `${config.gatewayUrl}/v1/stores/${config.storeId}/media?url=${encoded}&w=${w}&q=${q}&f=${f}&s=${s}`
