@@ -1,18 +1,16 @@
 import type { PixelConfig, PixelProvider } from './types.js'
 import { MetaPixelProvider } from './meta-pixel.js'
-
-const PROVIDER_REGISTRY: Record<string, new (pixelId: string) => PixelProvider> = {
-  meta: MetaPixelProvider,
-}
+import { GooglePixelProvider } from './google-pixel.js'
 
 export class PixelManager {
   private providers: PixelProvider[] = []
 
   constructor(configs: PixelConfig[]) {
     for (const config of configs) {
-      const Ctor = PROVIDER_REGISTRY[config.provider]
-      if (Ctor) {
-        this.providers.push(new Ctor(config.pixel_id))
+      if (config.provider === 'meta' && config.pixel_id) {
+        this.providers.push(new MetaPixelProvider(config.pixel_id))
+      } else if (config.provider === 'google' && config.measurement_id) {
+        this.providers.push(new GooglePixelProvider(config.measurement_id))
       }
     }
   }

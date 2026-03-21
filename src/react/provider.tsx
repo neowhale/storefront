@@ -12,6 +12,9 @@ import { AnalyticsTracker } from './components/analytics-tracker.js'
 import { CartInitializer } from './components/cart-initializer.js'
 import { AuthInitializer } from './components/auth-initializer.js'
 import { PixelInitializer } from './components/pixel-initializer.js'
+import { BehavioralTrackerComponent } from './components/behavioral-tracker.js'
+import { FingerprintCollector } from './components/fingerprint-collector.js'
+import { SessionRecorderComponent } from './components/session-recorder.js'
 import { ThemeProvider, type ThemeTokens } from '@neowhale/ui'
 
 /** Read a boolean env var (NEXT_PUBLIC_*). Returns undefined when absent. */
@@ -89,11 +92,47 @@ export function WhaleProvider({
       proxyPath: resolvedConfig.proxyPath,
     })
 
-    // Analytics callbacks wired into cart store
-    // These get called by the cart store on add/remove and fire analytics events.
-    // We can't use the useAnalytics hook here (not in a component), so we use
-    // the client directly — the AnalyticsTracker manages sessions.
-    const cartStore = createCartStore(client, resolvedConfig.storagePrefix)
+    // Analytics callbacks wired into cart store — fire events via client directly
+    // since we can't use the useAnalytics hook outside a component.
+    // Read session_id from localStorage (same key pattern as useAnalytics).
+    const readSessionId = (): string | undefined => {
+      try {
+        const raw = localStorage.getItem(`${resolvedConfig.storagePrefix}-analytics-session`)
+        if (!raw) return undefined
+        const stored = JSON.parse(raw) as { id: string; createdAt: number }
+        if (Date.now() - stored.createdAt < resolvedConfig.sessionTtl) return stored.id
+      } catch { /* ignore */ }
+      return undefined
+    }
+
+    /** Sync cart state to the analytics session (fire-and-forget). */
+    const syncCartToSession = (cartId: string, total: number, itemCount: number) => {
+      const sid = readSessionId()
+      if (sid && !sid.startsWith('local-')) {
+        client.updateSession(sid, {
+          cart_id: cartId,
+          cart_total: total,
+          cart_item_count: itemCount,
+          status: 'carting',
+        }).catch(() => {})
+      }
+    }
+
+    const onAddToCart = resolvedConfig.trackingEnabled
+      ? (productId: string, productName: string, quantity: number, price: number, tier?: string) => {
+          const sid = readSessionId()
+          if (sid) client.trackEvent({ session_id: sid, event_type: 'add_to_cart' as never, event_data: { product_id: productId, product_name: productName, quantity, price, tier } }).catch(() => {})
+        }
+      : undefined
+
+    const onRemoveFromCart = resolvedConfig.trackingEnabled
+      ? (productId: string, productName: string) => {
+          const sid = readSessionId()
+          if (sid) client.trackEvent({ session_id: sid, event_type: 'remove_from_cart' as never, event_data: { product_id: productId, product_name: productName } }).catch(() => {})
+        }
+      : undefined
+
+    const cartStore = createCartStore(client, resolvedConfig.storagePrefix, onAddToCart, onRemoveFromCart, syncCartToSession)
     const authStore = createAuthStore(client, resolvedConfig.storagePrefix)
 
     return {
@@ -127,6 +166,9 @@ export function WhaleProvider({
         <CartInitializer />
         <AnalyticsTracker pathname={pathname} />
         <PixelInitializer onReady={handlePixelReady} onTheme={handleTheme} />
+        <BehavioralTrackerComponent pathname={pathname} />
+        <FingerprintCollector />
+        <SessionRecorderComponent />
         {children}
       </ThemeProvider>
     </WhaleContext.Provider>

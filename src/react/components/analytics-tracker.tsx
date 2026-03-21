@@ -28,7 +28,8 @@ export function AnalyticsTracker({ pathname }: { pathname: string }) {
     if (pathname === prevPathname.current) return
     const referrer = prevPathname.current || (typeof document !== 'undefined' ? document.referrer : '')
     prevPathname.current = pathname
-    trackPageView(pathname, referrer || undefined)
+    const fullUrl = typeof window !== 'undefined' ? window.location.href : pathname
+    trackPageView(fullUrl, referrer || undefined)
   }, [pathname, trackPageView, trackingEnabled])
 
   // Link customer session on login

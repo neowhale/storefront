@@ -1,46 +1,24 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import type { QRLandingData } from '../../types.js'
+import { useEffect, useState } from 'react'
+import type { QRLandingData, LandingSection, LandingPageConfig } from '../../types.js'
+import { SectionRenderer, type SectionTheme, type ClickTrackingContext } from './section-renderer.js'
 
 export interface QRLandingPageProps {
-  /** QR code string (from URL param) */
   code: string
-  /** Gateway URL — defaults to https://whale-gateway.fly.dev */
   gatewayUrl?: string
-  /** Custom component for product display */
-  renderProduct?: (data: QRLandingData) => React.ReactNode
-  /** Custom component for COA/lab results */
-  renderCOA?: (data: QRLandingData) => React.ReactNode
-  /** Custom component for the full page (overrides default layout) */
-  renderPage?: (data: QRLandingData) => React.ReactNode
-  /** Called when data is loaded */
+  /** Override rendering for any section type */
+  renderSection?: (section: LandingSection, defaultRenderer: () => React.ReactNode) => React.ReactNode
   onDataLoaded?: (data: QRLandingData) => void
-  /** Called on error */
   onError?: (error: Error) => void
 }
 
 type LoadState = 'loading' | 'ready' | 'not_found' | 'expired' | 'error'
 
-/**
- * QR Landing Page — drop-in component that renders a branded landing page
- * for any QR code. Fetches data from the gateway's public endpoint.
- *
- * Usage:
- * ```tsx
- * // In app/qr/[code]/page.tsx:
- * import { QRLandingPage } from '@neowhale/storefront/react'
- * export default function Page({ params }: { params: { code: string } }) {
- *   return <QRLandingPage code={params.code} />
- * }
- * ```
- */
 export function QRLandingPage({
   code,
   gatewayUrl = 'https://whale-gateway.fly.dev',
-  renderProduct,
-  renderCOA,
-  renderPage,
+  renderSection,
   onDataLoaded,
   onError,
 }: QRLandingPageProps) {
@@ -55,16 +33,9 @@ export function QRLandingPage({
     async function load() {
       try {
         const res = await fetch(`${gatewayUrl}/q/${encodeURIComponent(code)}/page`)
-
         if (!cancelled) {
-          if (res.status === 404) {
-            setState('not_found')
-            return
-          }
-          if (res.status === 410) {
-            setState('expired')
-            return
-          }
+          if (res.status === 404) { setState('not_found'); return }
+          if (res.status === 410) { setState('expired'); return }
           if (!res.ok) {
             const body = await res.json().catch(() => ({}))
             throw new Error(body?.error?.message ?? `Failed to load: ${res.status}`)
@@ -95,243 +66,246 @@ export function QRLandingPage({
   if (state === 'error') return <DefaultError message={errorMsg} />
   if (!data) return null
 
-  // Full custom rendering
-  if (renderPage) return <>{renderPage(data)}</>
+  // If a landing page template is linked, use its sections.
+  // Otherwise, auto-generate sections from product/COA data.
+  const lp = data.landing_page
+  const sections = lp?.sections ?? buildDefaultSections(data)
 
-  // Default layout with optional slot overrides
-  return <DefaultLayout data={data} renderProduct={renderProduct} renderCOA={renderCOA} />
-}
+  const theme = extractTheme(data, lp)
+  const fontFamily = lp?.font_family
+    || (data.store?.theme?.fontDisplay as string)
+    || 'system-ui, -apple-system, sans-serif'
 
-// ─── Default Layout ─────────────────────────────────────────────────────────
+  const logoUrl = data.qr_code.logo_url || data.store?.logo_url
+  const storeName = data.store?.name
 
-function DefaultLayout({
-  data,
-  renderProduct,
-  renderCOA,
-}: {
-  data: QRLandingData
-  renderProduct?: (data: QRLandingData) => React.ReactNode
-  renderCOA?: (data: QRLandingData) => React.ReactNode
-}) {
-  const { qr_code: qr, store, product, coa } = data
-  const lp = qr.landing_page
-  const [showCOA, setShowCOA] = useState(false)
-
-  const bg = lp.background_color || store?.theme?.background as string || '#050505'
-  const fg = lp.text_color || store?.theme?.foreground as string || '#fafafa'
-  const accent = store?.theme?.accent as string || qr.brand_color || '#E8E2D9'
-  const surface = store?.theme?.surface as string || '#111'
-  const muted = store?.theme?.muted as string || '#888'
-  const logoUrl = qr.logo_url || store?.logo_url
-  const productImage = lp.image_url || (product?.featured_image as string) || (product?.image_gallery as string[])?.[0] || null
-  const productName = lp.title || (product?.name as string) || qr.name
-  const description = lp.description || (product?.description as string) || ''
-  const ctaText = lp.cta_text || (coa ? 'View Lab Results' : 'Learn More')
-  const ctaUrl = lp.cta_url || qr.destination_url
-
-  // Cannabinoid data from custom_fields
-  const cf = product?.custom_fields as Record<string, unknown> | null | undefined
-  const thca = (cf?.thca_percentage as number) ?? null
-  const thc = (cf?.d9_percentage as number) ?? null
-  const cbd = (cf?.cbd_total as number) ?? null
-  const strainType = (cf?.strain_type as string) ?? null
-  const categoryName = (product?.category_name as string) ?? null
-
-  const handleCOAClick = useCallback(() => {
-    if (coa) setShowCOA(true)
-  }, [coa])
+  const sorted = [...sections].sort((a, b) => a.order - b.order)
+  const tracking: ClickTrackingContext = { gatewayUrl, code }
 
   return (
-    <div style={{ minHeight: '100dvh', background: bg, color: fg, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100dvh', background: theme.bg, color: theme.fg, fontFamily }}>
+      {lp?.custom_css && <style>{lp.custom_css}</style>}
+
       {/* Header */}
-      <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'center' }}>
-        {logoUrl && (
-          <img
-            src={logoUrl}
-            alt={store?.name || 'Store'}
-            style={{ height: 40, objectFit: 'contain' }}
-          />
-        )}
-      </div>
-
-      {/* Product Image */}
-      {productImage && (
-        <div style={{ width: '100%', aspectRatio: '1', overflow: 'hidden', background: surface }}>
-          <img
-            src={productImage}
-            alt={productName}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
+      {logoUrl && (
+        <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+          <img src={logoUrl} alt={storeName || 'Store'} style={{ height: 40, objectFit: 'contain' }} />
         </div>
       )}
 
-      {/* Content */}
-      <div style={{ padding: '1.5rem', maxWidth: 480, margin: '0 auto' }}>
-        {/* Strain badge + category */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-          {strainType && (
-            <span style={{
-              padding: '0.25rem 0.75rem',
-              borderRadius: 999,
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              background: strainBadgeColor(strainType),
-              color: '#fff',
-            }}>
-              {strainType}
-            </span>
-          )}
-          {categoryName && (
-            <span style={{
-              padding: '0.25rem 0.75rem',
-              borderRadius: 999,
-              fontSize: '0.75rem',
-              background: surface,
-              color: muted,
-            }}>
-              {categoryName}
-            </span>
-          )}
-        </div>
+      {/* Sections */}
+      {sorted.map((section) => {
+        const defaultRenderer = () => (
+          <SectionRenderer key={section.id} section={section} data={data} theme={theme} tracking={tracking} />
+        )
 
-        {/* Product Name */}
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 600, margin: '0 0 0.5rem', lineHeight: 1.2 }}>
-          {productName}
-        </h1>
+        if (renderSection) {
+          return <div key={section.id}>{renderSection(section, defaultRenderer)}</div>
+        }
 
-        {description && (
-          <p style={{ color: muted, lineHeight: 1.6, margin: '0 0 1.5rem', fontSize: '0.95rem' }}>
-            {description}
+        return <SectionRenderer key={section.id} section={section} data={data} theme={theme} tracking={tracking} />
+      })}
+
+      {/* Footer */}
+      {storeName && (
+        <div style={{ padding: '2rem 1.5rem', borderTop: `1px solid ${theme.surface}`, textAlign: 'center' }}>
+          <p style={{ fontSize: '0.75rem', color: theme.muted, margin: 0 }}>
+            {storeName}{data.store?.tagline ? ` — ${data.store.tagline}` : ''}
           </p>
-        )}
-
-        {/* Custom product render slot */}
-        {renderProduct ? renderProduct(data) : null}
-
-        {/* Cannabinoid stats */}
-        {(thca || thc || cbd) && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', margin: '1.5rem 0' }}>
-            {thca != null && <StatCard label="THCa" value={`${thca.toFixed(1)}%`} bg={surface} fg={fg} accent={accent} />}
-            {thc != null && <StatCard label="D9 THC" value={`${thc.toFixed(1)}%`} bg={surface} fg={fg} accent={accent} />}
-            {cbd != null && <StatCard label="CBD" value={`${cbd.toFixed(1)}%`} bg={surface} fg={fg} accent={accent} />}
-          </div>
-        )}
-
-        {/* CTA Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem' }}>
-          {coa && (
-            <button
-              onClick={handleCOAClick}
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                background: accent,
-                color: bg,
-                border: 'none',
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                borderRadius: 0,
-              }}
-            >
-              View Lab Results
-            </button>
-          )}
-          {/* Custom COA render slot */}
-          {renderCOA ? renderCOA(data) : null}
-          <a
-            href={ctaUrl}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '0.875rem',
-              background: 'transparent',
-              color: fg,
-              border: `1px solid ${muted}`,
-              fontSize: '0.95rem',
-              fontWeight: 500,
-              textAlign: 'center',
-              textDecoration: 'none',
-              boxSizing: 'border-box',
-              borderRadius: 0,
-            }}
-          >
-            {ctaText === 'View Lab Results' ? 'Shop Online' : ctaText}
-          </a>
-        </div>
-
-        {/* Authenticity footer */}
-        <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: `1px solid ${surface}`, textAlign: 'center' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', color: muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Lab Tested
-            </span>
-            <span style={{ fontSize: '0.75rem', color: muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Authentic
-            </span>
-          </div>
-          {store?.name && (
-            <p style={{ fontSize: '0.75rem', color: muted, margin: 0 }}>
-              Verified by {store.name}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* COA Modal */}
-      {showCOA && coa && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(0,0,0,0.9)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
-            <span style={{ color: '#fff', fontWeight: 600 }}>{coa.document_name || 'Lab Results'}</span>
-            <button
-              onClick={() => setShowCOA(false)}
-              style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer', padding: '0.5rem' }}
-            >
-              ✕
-            </button>
-          </div>
-          <iframe
-            src={coa.url}
-            style={{ flex: 1, border: 'none', background: '#fff' }}
-            title="Lab Results"
-          />
         </div>
       )}
     </div>
   )
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Theme Extraction ─────────────────────────────────────────────────────────
 
-function StatCard({ label, value, bg, fg, accent }: { label: string; value: string; bg: string; fg: string; accent: string }) {
-  return (
-    <div style={{ background: bg, padding: '1rem', textAlign: 'center' }}>
-      <div style={{ fontSize: '1.25rem', fontWeight: 700, color: fg }}>{value}</div>
-      <div style={{ fontSize: '0.7rem', color: accent, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '0.25rem' }}>{label}</div>
-    </div>
-  )
+function extractTheme(data: QRLandingData, lp: LandingPageConfig | null): SectionTheme {
+  const t = data.store?.theme as Record<string, unknown> | null | undefined
+  const qrLp = data.qr_code.landing_page
+  return {
+    bg: lp?.background_color || qrLp.background_color || (t?.background as string) || '#050505',
+    fg: lp?.text_color || qrLp.text_color || (t?.foreground as string) || '#fafafa',
+    accent: lp?.accent_color || (t?.accent as string) || '#E8E2D9',
+    surface: (t?.surface as string) || '#111',
+    muted: (t?.muted as string) || '#888',
+    fontDisplay: (t?.fontDisplay as string) || 'system-ui, -apple-system, sans-serif',
+    fontBody: (t?.fontBody as string) || 'system-ui, -apple-system, sans-serif',
+  }
 }
 
-function strainBadgeColor(strain: string): string {
-  const s = strain.toLowerCase()
-  if (s === 'sativa') return '#22c55e'
-  if (s === 'indica') return '#8b5cf6'
-  if (s === 'hybrid') return '#f59e0b'
-  return '#6b7280'
+// ─── Default Sections Builder ─────────────────────────────────────────────────
+// When no landing page template is linked, generate sections from product data.
+
+function buildDefaultSections(data: QRLandingData): LandingSection[] {
+  const { product, coa, qr_code: qr } = data
+  const cf = product?.custom_fields as Record<string, unknown> | null | undefined
+  const sections: LandingSection[] = []
+  let order = 0
+
+  const productName = qr.landing_page.title || (product?.name as string) || qr.name
+  const productImage = qr.landing_page.image_url || (product?.featured_image as string) || null
+  const description = (product?.description as string) || ''
+  const categoryName = (product?.category_name as string) ?? null
+  const strainType = toStr(cf?.strain_type)
+  const tagline = toStr(cf?.tagline)
+
+  // Hero — product image with name and category/strain subtitle (no CTA here)
+  if (productImage) {
+    sections.push({
+      id: 'auto-hero',
+      type: 'hero',
+      order: order++,
+      content: {
+        title: productName,
+        subtitle: [categoryName, strainType].filter(Boolean).join(' · '),
+        background_image: productImage,
+      },
+    })
+  } else {
+    sections.push({
+      id: 'auto-header',
+      type: 'text',
+      order: order++,
+      content: {
+        heading: productName,
+        body: [categoryName, strainType].filter(Boolean).join(' · ') || undefined,
+      },
+      config: { align: 'center' },
+    })
+  }
+
+  // Tagline
+  if (tagline) {
+    sections.push({
+      id: 'auto-tagline',
+      type: 'text',
+      order: order++,
+      content: { body: tagline },
+      config: { align: 'center' },
+    })
+  }
+
+  // Cannabinoid stats
+  const thca = toNum(cf?.thca_percentage)
+  const thc = toNum(cf?.d9_percentage)
+  const cbd = toNum(cf?.cbd_total)
+  const stats: Array<{ label: string; value: string }> = []
+  if (thca != null) stats.push({ label: 'THCa', value: `${thca.toFixed(thca >= 1 ? 1 : 2)}%` })
+  if (thc != null) stats.push({ label: 'Δ9 THC', value: `${thc.toFixed(thc >= 1 ? 1 : 2)}%` })
+  if (cbd != null) stats.push({ label: 'CBD', value: `${cbd.toFixed(cbd >= 1 ? 1 : 2)}%` })
+
+  if (stats.length > 0) {
+    sections.push({
+      id: 'auto-stats',
+      type: 'stats',
+      order: order++,
+      content: { stats },
+    })
+  }
+
+  // Product details — genetics, terpenes, effects
+  const profileDetails: Array<{ label: string; value: string }> = []
+  const genetics = toStr(cf?.genetics)
+  const terpenes = toStr(cf?.terpenes)
+  const effects = toStr(cf?.effects)
+  const flavorProfile = toStr(cf?.flavor_profile)
+  const bestFor = toStr(cf?.best_for)
+
+  if (genetics) profileDetails.push({ label: 'Genetics', value: genetics })
+  if (terpenes) profileDetails.push({ label: 'Terpenes', value: terpenes })
+  if (effects) profileDetails.push({ label: 'Effects', value: effects })
+  if (flavorProfile) profileDetails.push({ label: 'Flavor', value: flavorProfile })
+  if (bestFor) profileDetails.push({ label: 'Best For', value: bestFor })
+
+  if (profileDetails.length > 0) {
+    sections.push({
+      id: 'auto-profile',
+      type: 'stats',
+      order: order++,
+      content: { stats: profileDetails },
+      config: { layout: 'list' },
+    })
+  }
+
+  // Description
+  if (description) {
+    sections.push({
+      id: 'auto-description',
+      type: 'text',
+      order: order++,
+      content: { heading: 'About', body: description },
+    })
+  }
+
+  // Lab results — single COA viewer button (the only "View Lab Results" on the page)
+  if (coa) {
+    sections.push({
+      id: 'auto-coa',
+      type: 'coa_viewer',
+      order: order++,
+      content: { button_text: 'View Lab Results' },
+    })
+  }
+
+  // Batch & testing info — below the COA button for reference
+  const labDetails: Array<{ label: string; value: string }> = []
+  const batchNumber = toStr(cf?.batch_number)
+  const dateTested = toStr(cf?.date_tested)
+
+  if (batchNumber) labDetails.push({ label: 'Batch', value: batchNumber })
+  if (dateTested) labDetails.push({ label: 'Tested', value: formatDate(dateTested) })
+
+  if (labDetails.length > 0) {
+    sections.push({
+      id: 'auto-lab-info',
+      type: 'stats',
+      order: order++,
+      content: { stats: labDetails },
+      config: { layout: 'list' },
+    })
+  }
+
+  // Shop link — only if product has a slug (link to storefront product page, not COA)
+  const productSlug = product?.slug as string | undefined
+  if (productSlug) {
+    const storeDomain = data.store?.name === 'Flora Distro' ? 'floradistro.com' : null
+    if (storeDomain) {
+      sections.push({
+        id: 'auto-shop',
+        type: 'cta',
+        order: order++,
+        content: {
+          buttons: [{ text: 'Shop This Product', url: `https://${storeDomain}/shop/${productSlug}`, style: 'outline' as const }],
+        },
+      })
+    }
+  }
+
+  return sections
 }
 
-// ─── State Screens ──────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function toNum(v: unknown): number | null {
+  if (v === '' || v == null) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function toStr(v: unknown): string | null {
+  if (v == null || v === '') return null
+  return String(v)
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr + 'T00:00:00')
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch { return dateStr }
+}
+
+// ─── State Screens ────────────────────────────────────────────────────────────
 
 const containerStyle: React.CSSProperties = {
   minHeight: '100dvh',

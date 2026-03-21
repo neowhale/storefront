@@ -16,6 +16,7 @@ export function useAuth() {
     isAuthenticated: s.isSessionValid(),
     sendCode: s.sendOTP,
     verifyCode: s.verifyOTP,
+    updateProfile: s.updateProfile,
     restoreSession: s.restoreSession,
     logout: s.logout,
     fetchCustomer: s.fetchCustomer,

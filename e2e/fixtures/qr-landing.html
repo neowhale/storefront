@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Landing Page E2E Harness</title>
+</head>
+<body>
+  <h1 id="status">Ready</h1>
+  <div id="app"></div>
+  <div id="log"></div>
+
+  <script>
+    // ---------------------------------------------------------------------------
+    // QR Landing Page E2E harness — mimics the storefront's QR landing page
+    // rendering and CTA click tracking (section-renderer.tsx trackClick logic).
+    // No build step — Playwright intercepts all outbound requests.
+    // ---------------------------------------------------------------------------
+
+    const GATEWAY_URL = '';  // relative — Playwright intercepts via page.route()
+    const QR_CODE = 'test-qr-e2e';
+
+    function log(msg) {
+      const el = document.getElementById('log');
+      const p = document.createElement('p');
+      p.textContent = msg;
+      el.appendChild(p);
+    }
+
+    // -- Click tracking (mirrors section-renderer.tsx trackClick) ---------------
+
+    function trackClick(label, url, position) {
+      const body = JSON.stringify({ label, url, position: position ?? undefined });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(
+          `${GATEWAY_URL}/q/${encodeURIComponent(QR_CODE)}/click`,
+          new Blob([body], { type: 'application/json' })
+        );
+      }
+    }
+
+    // -- Render mock landing page sections --------------------------------------
+
+    function renderLandingPage(data) {
+      const app = document.getElementById('app');
+      app.innerHTML = '';
+
+      // Hero with CTA
+      if (data.hero) {
+        const section = document.createElement('div');
+        section.id = 'hero-section';
+        section.innerHTML = `<h2>${data.hero.title || ''}</h2>`;
+        if (data.hero.cta_text && data.hero.cta_url) {
+          const a = document.createElement('a');
+          a.href = data.hero.cta_url;
+          a.textContent = data.hero.cta_text;
+          a.dataset.testid = 'hero-cta';
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            trackClick(data.hero.cta_text, data.hero.cta_url);
+          });
+          section.appendChild(a);
+        }
+        app.appendChild(section);
+      }
+
+      // CTA buttons
+      if (data.buttons && data.buttons.length > 0) {
+        const section = document.createElement('div');
+        section.id = 'cta-section';
+        data.buttons.forEach((btn, i) => {
+          const a = document.createElement('a');
+          a.href = btn.url;
+          a.textContent = btn.text;
+          a.dataset.testid = `cta-btn-${i}`;
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            trackClick(btn.text, btn.url, i);
+          });
+          section.appendChild(a);
+        });
+        app.appendChild(section);
+      }
+
+      // Product card with "View Product" link
+      if (data.product) {
+        const section = document.createElement('div');
+        section.id = 'product-section';
+        section.innerHTML = `<h3>${data.product.name || ''}</h3>`;
+        if (data.product.url) {
+          const a = document.createElement('a');
+          a.href = data.product.url;
+          a.textContent = 'View Product';
+          a.dataset.testid = 'product-link';
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            trackClick('View Product', data.product.url);
+          });
+          section.appendChild(a);
+        }
+        app.appendChild(section);
+      }
+
+      // COA viewer button
+      if (data.coa) {
+        const section = document.createElement('div');
+        section.id = 'coa-section';
+        const btn = document.createElement('button');
+        const label = data.coa.button_text || 'View Lab Results';
+        btn.textContent = label;
+        btn.dataset.testid = 'coa-btn';
+        btn.addEventListener('click', () => {
+          trackClick(label, data.coa.viewer_url || data.coa.url);
+        });
+        section.appendChild(btn);
+        app.appendChild(section);
+      }
+    }
+
+    // -- Expose harness globally for Playwright evaluate() calls ----------------
+
+    window.__qrHarness = {
+      GATEWAY_URL,
+      QR_CODE,
+      trackClick,
+      renderLandingPage,
+    };
+
+    log('QR Landing harness loaded');
+    document.getElementById('status').textContent = 'Loaded';
+  </script>
+</body>
+</html>

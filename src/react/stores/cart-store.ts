@@ -43,7 +43,8 @@ export function createCartStore(
   client: WhaleClient,
   storagePrefix: string,
   onAddToCart?: (productId: string, productName: string, quantity: number, price: number, tier?: string) => void,
-  onRemoveFromCart?: (productId: string, productName: string) => void
+  onRemoveFromCart?: (productId: string, productName: string) => void,
+  onCartChange?: (cartId: string, total: number, itemCount: number) => void,
 ) {
   return createStore<CartState & CartActions>()(
     persist(
@@ -149,6 +150,10 @@ export function createCartStore(
 
             // Analytics callback
             onAddToCart?.(productId, productName || '', quantity, unitPrice || 0, tier)
+
+            // Sync cart state to analytics session
+            const state = get()
+            if (state.cartId) onCartChange?.(state.cartId, state.total, state.itemCount)
           } finally {
             set({ cartLoading: false, addItemInFlight: false })
           }
@@ -161,6 +166,10 @@ export function createCartStore(
             if (!cartId) return
             await client.updateCartItem(cartId, itemId, quantity)
             await get().syncCart()
+
+            // Sync cart state to analytics session
+            const state = get()
+            if (state.cartId) onCartChange?.(state.cartId, state.total, state.itemCount)
           } finally {
             set({ cartLoading: false })
           }
@@ -179,6 +188,10 @@ export function createCartStore(
             if (item) {
               onRemoveFromCart?.(item.product_id, productName || item.product_name)
             }
+
+            // Sync cart state to analytics session
+            const state = get()
+            if (state.cartId) onCartChange?.(state.cartId, state.total, state.itemCount)
           } finally {
             set({ cartLoading: false })
           }

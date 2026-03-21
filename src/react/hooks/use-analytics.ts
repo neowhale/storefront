@@ -5,10 +5,44 @@ import { WhaleContext } from '../context.js'
 import type { EventType } from '../../types.js'
 
 const SESSION_KEY_SUFFIX = '-analytics-session'
+const VISITOR_KEY_SUFFIX = '-visitor-id'
 
 interface SessionData {
   id: string
   createdAt: number
+}
+
+/** Parse UTM parameters, gclid, and fbclid from the current URL. */
+function parseMarketingParams(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  const params = new URLSearchParams(window.location.search)
+  const result: Record<string, string> = {}
+  for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid']) {
+    const val = params.get(key)
+    if (val) result[key] = val
+  }
+  return result
+}
+
+/** Get or create a persistent visitor ID. */
+function getVisitorId(prefix: string): string {
+  const key = `${prefix}${VISITOR_KEY_SUFFIX}`
+  try {
+    const existing = localStorage.getItem(key)
+    if (existing) return existing
+  } catch {}
+  const id = `v-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  try { localStorage.setItem(key, id) } catch {}
+  return id
+}
+
+/** Detect device type from user agent. */
+function detectDevice(): string {
+  if (typeof navigator === 'undefined') return 'unknown'
+  const ua = navigator.userAgent
+  if (/Mobi|Android/i.test(ua)) return 'mobile'
+  if (/Tablet|iPad/i.test(ua)) return 'tablet'
+  return 'desktop'
 }
 
 export function useAnalytics() {
@@ -40,9 +74,15 @@ export function useAnalytics() {
 
       // Create new
       try {
+        const marketing = parseMarketingParams()
+        const visitorId = getVisitorId(config.storagePrefix)
         const session = await client.createSession({
+          visitor_id: visitorId,
           user_agent: navigator.userAgent,
           referrer: document.referrer || undefined,
+          page_url: window.location.href,
+          device: detectDevice(),
+          ...marketing,
         })
         if (session?.id) {
           localStorage.setItem(sessionKey, JSON.stringify({ id: session.id, createdAt: Date.now() }))
@@ -80,10 +120,12 @@ export function useAnalytics() {
       // Then fire gateway event (server-side attribution) with same event_id
       try {
         const sessionId = await getOrCreateSession()
+        const visitorId = getVisitorId(config.storagePrefix)
         await client.trackEvent({
           session_id: sessionId,
           event_type: eventType,
           event_data: { ...data, event_id: eventId },
+          visitor_id: visitorId,
         })
       } catch {
         // fire-and-forget
@@ -106,9 +148,38 @@ export function useAnalytics() {
     [client, getOrCreateSession, trackingEnabled]
   )
 
+  const updateSessionCart = useCallback(
+    async (cartId: string, cartTotal: number, cartItemCount: number) => {
+      if (!trackingEnabled) return
+      try {
+        const sessionId = await getOrCreateSession()
+        if (sessionId.startsWith('local-')) return
+        await client.updateSession(sessionId, {
+          cart_id: cartId,
+          cart_total: cartTotal,
+          cart_item_count: cartItemCount,
+          status: 'carting',
+        })
+      } catch {}
+    },
+    [client, getOrCreateSession, trackingEnabled]
+  )
+
+  const updateSessionOrder = useCallback(
+    async (orderId: string) => {
+      if (!trackingEnabled) return
+      try {
+        const sessionId = await getOrCreateSession()
+        if (sessionId.startsWith('local-')) return
+        await client.updateSession(sessionId, { order_id: orderId, status: 'converted' })
+      } catch {}
+    },
+    [client, getOrCreateSession, trackingEnabled]
+  )
+
   const trackPageView = useCallback(
     (url: string, referrer?: string) => {
-      track('page_view', { url, referrer })
+      track('page_view', { url, referrer, page_url: url })
     },
     [track]
   )
@@ -173,6 +244,8 @@ export function useAnalytics() {
     trackAddToCart,
     trackRemoveFromCart,
     linkCustomer,
+    updateSessionCart,
+    updateSessionOrder,
     getOrCreateSession,
     /** Whether tracking is globally enabled for this storefront */
     trackingEnabled,

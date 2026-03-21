@@ -8,6 +8,7 @@ export interface PixelProvider {
 export interface PixelConfig {
   provider: string
   pixel_id: string
+  measurement_id?: string
 }
 
 export interface StorefrontConfig {

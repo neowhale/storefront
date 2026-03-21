@@ -13,6 +13,7 @@ export interface AuthState {
 export interface AuthActions {
   sendOTP: (email: string) => Promise<boolean>
   verifyOTP: (email: string, code: string) => Promise<boolean>
+  updateProfile: (data: { first_name: string; last_name: string; phone?: string; date_of_birth?: string }) => Promise<void>
   restoreSession: () => Promise<void>
   isSessionValid: () => boolean
   logout: () => void
@@ -71,6 +72,13 @@ export function createAuthStore(client: WhaleClient, storagePrefix: string) {
           } finally {
             set({ authLoading: false })
           }
+        },
+
+        updateProfile: async (data) => {
+          const customer = get().customer
+          if (!customer?.id) throw new Error('Not authenticated')
+          const updated = await client.updateProfile(customer.id, data)
+          set({ customer: updated })
         },
 
         restoreSession: async () => {
