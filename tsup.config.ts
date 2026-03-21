@@ -10,7 +10,7 @@ export default defineConfig({
   dts: true,
   splitting: true,
   clean: true,
-  external: ['react', 'react-dom', 'next', 'next/navigation', 'next/server', 'zustand', 'zustand/vanilla', 'zustand/middleware'],
+  external: ['react', 'react-dom', 'next', 'next/navigation', 'next/server', 'zustand', 'zustand/vanilla', 'zustand/middleware', '@neowhale/ui'],
   treeshake: true,
   sourcemap: true,
 })
