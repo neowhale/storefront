@@ -263,7 +263,8 @@ function GallerySection({ section, theme }: { section: LandingSection; theme: Se
 }
 
 function CTASection({ section, theme, tracking }: { section: LandingSection; theme: SectionTheme; tracking?: ClickTrackingContext }) {
-  const { buttons } = section.content as {
+  const { title, subtitle, buttons } = section.content as {
+    title?: string; subtitle?: string
     buttons?: Array<{ text: string; url: string; style?: 'primary' | 'outline' }>
   }
 
@@ -271,6 +272,33 @@ function CTASection({ section, theme, tracking }: { section: LandingSection; the
 
   return (
     <div style={{ padding: '2rem 1.5rem', maxWidth: 480, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {title && (
+        <h2 style={{
+          fontSize: 'clamp(1.25rem, 4vw, 1.5rem)',
+          fontWeight: 300,
+          fontFamily: theme.fontDisplay || 'inherit',
+          margin: '0 0 0.25rem',
+          lineHeight: 1.2,
+          letterSpacing: '-0.02em',
+          color: theme.fg,
+          textAlign: 'center',
+        }}>
+          {title}
+        </h2>
+      )}
+      {subtitle && (
+        <p style={{
+          fontSize: '0.8rem',
+          color: theme.accent,
+          margin: '0 0 0.75rem',
+          lineHeight: 1.6,
+          textTransform: 'uppercase',
+          letterSpacing: '0.15em',
+          textAlign: 'center',
+        }}>
+          {subtitle}
+        </p>
+      )}
       {buttons.map((btn, i) => {
         const isPrimary = btn.style !== 'outline'
         return (

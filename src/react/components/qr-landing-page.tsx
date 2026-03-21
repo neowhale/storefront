@@ -186,14 +186,31 @@ function buildDefaultSections(data: QRLandingData): LandingSection[] {
     })
   }
 
-  // Cannabinoid stats
+  // Detect product type from category or custom fields
+  const totalMg = toNum(cf?.total_mg_per_package ?? cf?.total_mg)
+  const mgPerPiece = toNum(cf?.mg_per_piece)
+  const piecesPerPkg = toNum(cf?.pieces_per_package)
+  const isEdible = totalMg != null || mgPerPiece != null || piecesPerPkg != null
+
+  // Cannabinoid / dosage stats — layout adapts to product type
   const thca = toNum(cf?.thca_percentage)
   const thc = toNum(cf?.d9_percentage)
   const cbd = toNum(cf?.cbd_total)
   const stats: Array<{ label: string; value: string }> = []
-  if (thca != null) stats.push({ label: 'THCa', value: `${thca.toFixed(thca >= 1 ? 1 : 2)}%` })
-  if (thc != null) stats.push({ label: 'Δ9 THC', value: `${thc.toFixed(thc >= 1 ? 1 : 2)}%` })
-  if (cbd != null) stats.push({ label: 'CBD', value: `${cbd.toFixed(cbd >= 1 ? 1 : 2)}%` })
+
+  if (isEdible) {
+    // Edibles: lead with dosage info (mg is what customers care about)
+    if (totalMg != null) stats.push({ label: 'Total MG', value: `${fmtMg(totalMg)}` })
+    if (mgPerPiece != null) stats.push({ label: 'Per Piece', value: `${fmtMg(mgPerPiece)}mg` })
+    if (piecesPerPkg != null) stats.push({ label: 'Pieces', value: `${piecesPerPkg}` })
+    // Still show cannabinoids if present (secondary)
+    if (thc != null) stats.push({ label: 'Δ9 THC', value: `${thc.toFixed(thc >= 1 ? 1 : 2)}%` })
+  } else {
+    // Flower/concentrates: lead with cannabinoid percentages
+    if (thca != null) stats.push({ label: 'THCa', value: `${thca.toFixed(thca >= 1 ? 1 : 2)}%` })
+    if (thc != null) stats.push({ label: 'Δ9 THC', value: `${thc.toFixed(thc >= 1 ? 1 : 2)}%` })
+    if (cbd != null) stats.push({ label: 'CBD', value: `${cbd.toFixed(cbd >= 1 ? 1 : 2)}%` })
+  }
 
   if (stats.length > 0) {
     sections.push({
@@ -202,6 +219,26 @@ function buildDefaultSections(data: QRLandingData): LandingSection[] {
       order: order++,
       content: { stats },
     })
+  }
+
+  // Edible serving info (if not already covered in stats)
+  if (isEdible) {
+    const servingDetails: Array<{ label: string; value: string }> = []
+    const servingSize = toStr(cf?.serving_size)
+    const ingredients = toStr(cf?.ingredients)
+    const allergens = toStr(cf?.allergens)
+    if (servingSize) servingDetails.push({ label: 'Serving Size', value: servingSize })
+    if (ingredients) servingDetails.push({ label: 'Ingredients', value: ingredients })
+    if (allergens) servingDetails.push({ label: 'Allergens', value: allergens })
+    if (servingDetails.length > 0) {
+      sections.push({
+        id: 'auto-serving',
+        type: 'stats',
+        order: order++,
+        content: { stats: servingDetails },
+        config: { layout: 'list' },
+      })
+    }
   }
 
   // Product details — genetics, terpenes, effects
@@ -291,6 +328,10 @@ function toNum(v: unknown): number | null {
   if (v === '' || v == null) return null
   const n = Number(v)
   return Number.isFinite(n) ? n : null
+}
+
+function fmtMg(mg: number): string {
+  return mg === Math.floor(mg) ? `${mg}mg` : `${mg.toFixed(1)}mg`
 }
 
 function toStr(v: unknown): string | null {

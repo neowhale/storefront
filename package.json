@@ -1,6 +1,6 @@
 {
   "name": "@neowhale/storefront",
-  "version": "0.2.20",
+  "version": "0.2.22",
   "description": "React/Next.js SDK for WhaleTools storefronts — cart, auth, analytics, and more",
   "type": "module",
   "main": "dist/index.js",
