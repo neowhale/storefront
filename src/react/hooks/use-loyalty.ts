@@ -3,7 +3,7 @@
 import { useContext, useState, useEffect, useCallback } from 'react'
 import { useStore } from 'zustand'
 import { WhaleContext } from '../context.js'
-import type { LoyaltyAccount, LoyaltyReward, LoyaltyTransaction } from '../../types.js'
+import type { LoyaltyAccount, LoyaltyReward, LoyaltyTransaction, Product } from '../../types.js'
 
 export function useLoyalty() {
   const ctx = useContext(WhaleContext)
@@ -53,5 +53,10 @@ export function useLoyalty() {
     return result
   }, [customer?.id, ctx.client, refresh])
 
-  return { account, rewards, transactions, loading, error, refresh, redeemReward }
+  const fetchProductsByCategory = useCallback(async (category: string, locationId: string, tier?: string): Promise<Product[]> => {
+    const res = await ctx.client.listLoyaltyProducts({ category, location_id: locationId, tier })
+    return res.data
+  }, [ctx.client])
+
+  return { account, rewards, transactions, loading, error, refresh, redeemReward, fetchProductsByCategory }
 }

@@ -300,22 +300,54 @@ export class WhaleClient {
 
   // -- Analytics / Storefront Sessions --
 
-  async createSession(params: { user_agent?: string; referrer?: string }): Promise<StorefrontSession> {
+  async createSession(params: {
+    visitor_id?: string
+    user_agent?: string
+    referrer?: string
+    page_url?: string
+    device?: string
+    utm_source?: string
+    utm_medium?: string
+    utm_campaign?: string
+    utm_content?: string
+    utm_term?: string
+    gclid?: string
+    fbclid?: string
+  }): Promise<StorefrontSession> {
     return this.request<StorefrontSession>('/storefront/sessions', { method: 'POST', body: JSON.stringify(params) })
   }
 
-  async updateSession(sessionId: string, params: { last_active_at?: string; customer_id?: string }): Promise<StorefrontSession> {
+  async updateSession(sessionId: string, params: {
+    last_active_at?: string
+    customer_id?: string
+    customer_first_name?: string
+    customer_last_name?: string
+    cart_id?: string
+    cart_item_count?: number
+    cart_total?: number
+    order_id?: string
+    fingerprint_id?: string
+    status?: string
+    current_page?: string
+  }): Promise<StorefrontSession> {
     return this.request<StorefrontSession>(`/storefront/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify(params) })
   }
 
-  async trackEvent(params: { session_id: string; event_type: EventType; event_data?: Record<string, unknown> }): Promise<void> {
+  async trackEvent(params: { session_id: string; event_type: EventType; event_data?: Record<string, unknown>; visitor_id?: string }): Promise<void> {
     const url = `${this.baseUrl}/v1/stores/${this.storeId}/storefront/events`
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'x-api-key': this.apiKey,
     }
     if (this._sessionToken) headers['Authorization'] = `Bearer ${this._sessionToken}`
-    await resilientSend(url, params, headers)
+    // Map SDK field names to gateway field names
+    const payload: Record<string, unknown> = {
+      event_name: params.event_type,
+      session_id: params.session_id,
+      event_properties: params.event_data,
+    }
+    if (params.visitor_id) payload.visitor_id = params.visitor_id
+    await resilientSend(url, payload, headers)
   }
 
   // -- Checkout Sessions --
@@ -328,6 +360,8 @@ export class WhaleClient {
     shipping_method_id?: string
     coupon_code?: string
     referral_code?: string
+    loyalty_reward_id?: string
+    selected_product_id?: string
   }): Promise<CheckoutSession> {
     return this.request<CheckoutSession>('/storefront/checkout', {
       method: 'POST',
@@ -352,15 +386,22 @@ export class WhaleClient {
     })
   }
 
-  async completeCheckout(sessionId: string, payment?: PaymentData): Promise<Order> {
+  async completeCheckout(sessionId: string, payment?: PaymentData, opts?: {
+    loyalty_reward_id?: string
+    selected_product_id?: string
+  }): Promise<Order> {
     return this.request<Order>(`/storefront/checkout/${sessionId}/complete`, {
       method: 'POST',
-      body: JSON.stringify(payment ? {
-        payment_method: payment.payment_method,
-        ...(payment.opaque_data && { opaque_data: payment.opaque_data }),
-        ...(payment.billTo && { bill_to: payment.billTo }),
-        ...(payment.shipTo && { ship_to: payment.shipTo }),
-      } : {}),
+      body: JSON.stringify({
+        ...(payment && {
+          payment_method: payment.payment_method,
+          ...(payment.opaque_data && { opaque_data: payment.opaque_data }),
+          ...(payment.billTo && { bill_to: payment.billTo }),
+          ...(payment.shipTo && { ship_to: payment.shipTo }),
+        }),
+        ...(opts?.loyalty_reward_id && { loyalty_reward_id: opts.loyalty_reward_id }),
+        ...(opts?.selected_product_id && { selected_product_id: opts.selected_product_id }),
+      }),
     })
   }
 
@@ -418,6 +459,16 @@ export class WhaleClient {
     return this.request<ListResponse<LoyaltyTransaction>>(
       `/storefront/loyalty/${customerId}/transactions${qs ? `?${qs}` : ''}`
     )
+  }
+
+  async listLoyaltyProducts(params: {
+    category: string
+    location_id: string
+    tier?: string
+  }): Promise<ListResponse<Product>> {
+    const sp = new URLSearchParams({ category: params.category, location_id: params.location_id })
+    if (params.tier) sp.set('tier', params.tier)
+    return this.request<ListResponse<Product>>(`/storefront/loyalty/products?${sp}`)
   }
 
   async redeemLoyaltyReward(customerId: string, rewardId: string): Promise<{ success: boolean; points_remaining: number }> {

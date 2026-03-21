@@ -82,6 +82,7 @@ export interface LoyaltyAccount {
   points_balance: number
   tier: string
   lifetime_points: number
+  redemption_mode?: 'cash' | 'rewards_only'
 }
 
 export interface LoyaltyReward {
@@ -91,6 +92,8 @@ export interface LoyaltyReward {
   points_cost: number
   reward_type: string
   is_active: boolean
+  reward_category?: string
+  reward_product_tier?: string
 }
 
 export interface LoyaltyTransaction {

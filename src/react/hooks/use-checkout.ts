@@ -19,6 +19,8 @@ export function useCheckout() {
     billing_address?: Address
     shipping_method_id?: string
     coupon_code?: string
+    loyalty_reward_id?: string
+    selected_product_id?: string
   }) => {
     setLoading(true)
     setError(null)
@@ -58,12 +60,15 @@ export function useCheckout() {
     }
   }, [ctx.client, session])
 
-  const complete = useCallback(async (payment?: PaymentData): Promise<Order> => {
+  const complete = useCallback(async (payment?: PaymentData, opts?: {
+    loyalty_reward_id?: string
+    selected_product_id?: string
+  }): Promise<Order> => {
     if (!session) throw new Error('No active checkout session')
     setLoading(true)
     setError(null)
     try {
-      const order = await ctx.client.completeCheckout(session.id, payment)
+      const order = await ctx.client.completeCheckout(session.id, payment, opts)
       setSession(null)
       return order
     } catch (err) {
