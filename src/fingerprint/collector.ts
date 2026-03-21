@@ -116,7 +116,7 @@ async function getAudioFingerprint(): Promise<string> {
 
     const buffer = await context.startRendering()
     const samples = buffer.getChannelData(0).slice(0, 100)
-    const sampleStr = Array.from(samples)
+    const sampleStr = Array.from(samples as ArrayLike<number>)
       .map((s) => s.toString())
       .join(',')
 
