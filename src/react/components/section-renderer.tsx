@@ -532,10 +532,14 @@ function LeadCaptureSection({ section, data, theme }: { section: LandingSection;
     source?: string
     landing_page_slug?: string
     tags?: string[]
+    show_newsletter_opt_in?: boolean
+    newsletter_label?: string
+    newsletter_tag?: string
   }
 
   const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -559,7 +563,11 @@ function LeadCaptureSection({ section, data, theme }: { section: LandingSection;
           first_name: firstName || undefined,
           source: c.source || 'landing_page',
           landing_page_slug: slug || undefined,
-          tags: c.tags || undefined,
+          tags: (() => {
+            const t = [...(c.tags || [])]
+            if (newsletterOptIn) t.push(c.newsletter_tag || 'newsletter-subscriber')
+            return t.length > 0 ? t : undefined
+          })(),
         }),
       })
 
@@ -686,6 +694,33 @@ function LeadCaptureSection({ section, data, theme }: { section: LandingSection;
                   style={inputStyle}
                 />
               </div>
+
+              {c.show_newsletter_opt_in !== false && (
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  color: `${theme.fg}90`,
+                  fontWeight: 300,
+                  lineHeight: 1.4,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={newsletterOptIn}
+                    onChange={(e) => setNewsletterOptIn(e.target.checked)}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      accentColor: theme.accent,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                  />
+                  {c.newsletter_label || 'Also sign me up for the newsletter — new drops, deals, and company news.'}
+                </label>
+              )}
 
               {status === 'error' && errorMsg && (
                 <p style={{ fontSize: '0.8rem', color: '#e55', margin: 0, fontWeight: 400 }}>
