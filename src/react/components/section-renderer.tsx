@@ -563,6 +563,7 @@ function LeadCaptureSection({ section, data, theme }: { section: LandingSection;
           first_name: firstName || undefined,
           source: c.source || 'landing_page',
           landing_page_slug: slug || undefined,
+          newsletter_opt_in: newsletterOptIn || undefined,
           tags: (() => {
             const t = [...(c.tags || [])]
             if (newsletterOptIn) t.push(c.newsletter_tag || 'newsletter-subscriber')
