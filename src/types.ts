@@ -302,6 +302,10 @@ export interface StorefrontSession {
   customer_id?: string
   started_at: string
   last_active_at: string
+  latitude?: number
+  longitude?: number
+  geolocation_source?: 'browser_gps' | 'ip' | 'zip' | 'address' | 'manual'
+  geolocation_accuracy?: number
 }
 
 // ─── Generic Responses ──────────────────────────────────────────────────────
@@ -363,6 +367,8 @@ export type EventType =
   | 'purchase'
   | 'category_view'
   | 'search'
+  | 'lead'
+  | 'cta_click'
 
 // -- QR Landing Page --
 

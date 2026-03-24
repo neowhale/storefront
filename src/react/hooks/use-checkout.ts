@@ -3,10 +3,13 @@
 import { useContext, useState, useCallback } from 'react'
 import { WhaleContext } from '../context.js'
 import type { CheckoutSession, Order, Address, PaymentData } from '../../types.js'
+import { useAnalytics } from './use-analytics.js'
 
 export function useCheckout() {
   const ctx = useContext(WhaleContext)
   if (!ctx) throw new Error('useCheckout must be used within <WhaleProvider>')
+
+  const { visitorId, getOrCreateSession: getAnalyticsSession } = useAnalytics()
 
   const [session, setSession] = useState<CheckoutSession | null>(null)
   const [loading, setLoading] = useState(false)
@@ -25,7 +28,13 @@ export function useCheckout() {
     setLoading(true)
     setError(null)
     try {
-      const data = await ctx.client.createCheckoutSession(params)
+      // Auto-inject attribution from analytics session
+      const analyticsSessionId = await getAnalyticsSession().catch(() => undefined)
+      const data = await ctx.client.createCheckoutSession({
+        ...params,
+        visitor_id: visitorId,
+        session_id: analyticsSessionId?.startsWith('local-') ? undefined : analyticsSessionId,
+      })
       setSession(data)
       return data
     } catch (err) {

@@ -233,6 +233,59 @@ export function useAnalytics() {
     [track]
   )
 
+  /**
+   * Request browser geolocation and attach coordinates to the current session.
+   * Best called after a user interaction (e.g. age gate confirmation) so the
+   * browser permission prompt has high grant rates.
+   *
+   * Returns the captured position or null if denied/unavailable.
+   */
+  const captureGeolocation = useCallback(
+    async (options?: { timeout?: number; enableHighAccuracy?: boolean }): Promise<GeolocationPosition | null> => {
+      if (!trackingEnabled) return null
+      if (typeof navigator === 'undefined' || !navigator.geolocation) return null
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: options?.timeout ?? 10000,
+            enableHighAccuracy: options?.enableHighAccuracy ?? true,
+          })
+        })
+
+        const { latitude, longitude, accuracy } = position.coords
+
+        // Attach to current session
+        const sessionId = await getOrCreateSession()
+        if (sessionId && !sessionId.startsWith('local-')) {
+          await client.updateSession(sessionId, {
+            latitude,
+            longitude,
+            geolocation_source: 'browser_gps',
+            geolocation_accuracy: accuracy,
+          })
+        }
+
+        // Fire tracking event
+        track('location_granted' as EventType, {
+          accuracy,
+          trigger: 'sdk',
+          device_type: detectDevice(),
+        })
+
+        return position
+      } catch (error) {
+        track('location_denied' as EventType, {
+          error: error instanceof Error ? error.message : 'unknown',
+          trigger: 'sdk',
+          device_type: detectDevice(),
+        })
+        return null
+      }
+    },
+    [client, getOrCreateSession, track, trackingEnabled]
+  )
+
   return {
     track,
     trackPageView,
@@ -247,9 +300,12 @@ export function useAnalytics() {
     updateSessionCart,
     updateSessionOrder,
     getOrCreateSession,
+    captureGeolocation,
     /** Whether tracking is globally enabled for this storefront */
     trackingEnabled,
     /** Configured recording sample rate (0–1) for behavioral session replays */
     recordingRate: config.recordingRate,
+    /** Stable visitor ID for cross-session attribution */
+    visitorId: getVisitorId(config.storagePrefix),
   }
 }

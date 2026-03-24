@@ -1,6 +1,6 @@
 {
   "name": "@neowhale/storefront",
-  "version": "0.2.27",
+  "version": "0.2.38",
   "description": "React/Next.js SDK for WhaleTools storefronts — cart, auth, analytics, and more",
   "type": "module",
   "main": "dist/index.js",
@@ -20,6 +20,9 @@
       "types": "./dist/next/index.d.ts",
       "import": "./dist/next/index.js",
       "require": "./dist/next/index.cjs"
+    },
+    "./landing": {
+      "script": "./dist/landing.global.js"
     }
   },
   "files": [

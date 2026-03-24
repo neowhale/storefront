@@ -10,6 +10,8 @@ const EVENT_MAP: Record<string, string> = {
   purchase: 'purchase',
   search: 'search',
   category_view: 'view_item_list',
+  lead: 'generate_lead',
+  cta_click: 'select_content',
 }
 
 export class GooglePixelProvider implements PixelProvider {
