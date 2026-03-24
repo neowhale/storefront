@@ -90,21 +90,35 @@ export class WhaleClient {
     }
     if (opts?.revalidate !== undefined) fetchOptions.next = { revalidate: opts.revalidate }
 
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) {
-      let message = `Gateway error ${res.status}: ${res.statusText}`
-      try {
-        const body = await res.json()
-        if (body?.message) message = body.message
-        else if (typeof body?.error === 'string') message = body.error
-        else if (body?.error?.message) message = body.error.message
-      } catch { /* ignore parse errors */ }
-      const err = new Error(message) as Error & { status: number }
-      err.status = res.status
-      throw err
+    // Retry once on 429 (rate limited) — respect Retry-After header
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(url, fetchOptions)
+
+      if (res.status === 429 && attempt === 0) {
+        const retryAfter = res.headers.get('Retry-After')
+        const waitMs = retryAfter ? Math.min(Number(retryAfter) * 1000, 10_000) : 2_000
+        await new Promise(r => setTimeout(r, waitMs))
+        continue
+      }
+
+      if (!res.ok) {
+        let message = `Gateway error ${res.status}: ${res.statusText}`
+        try {
+          const body = await res.json()
+          if (body?.message) message = body.message
+          else if (typeof body?.error === 'string') message = body.error
+          else if (body?.error?.message) message = body.error.message
+        } catch { /* ignore parse errors */ }
+        const err = new Error(message) as Error & { status: number }
+        err.status = res.status
+        throw err
+      }
+      if (res.status === 204) return undefined as T
+      return res.json() as Promise<T>
     }
-    if (res.status === 204) return undefined as T
-    return res.json() as Promise<T>
+
+    // Should not reach here, but satisfy TypeScript
+    throw new Error('Request failed after retry')
   }
 
   // -- Products --
@@ -313,6 +327,10 @@ export class WhaleClient {
     utm_term?: string
     gclid?: string
     fbclid?: string
+    latitude?: number
+    longitude?: number
+    geolocation_source?: 'browser_gps' | 'ip' | 'zip' | 'address' | 'manual'
+    geolocation_accuracy?: number
   }): Promise<StorefrontSession> {
     return this.request<StorefrontSession>('/storefront/sessions', { method: 'POST', body: JSON.stringify(params) })
   }
@@ -329,6 +347,10 @@ export class WhaleClient {
     fingerprint_id?: string
     status?: string
     current_page?: string
+    latitude?: number
+    longitude?: number
+    geolocation_source?: 'browser_gps' | 'ip' | 'zip' | 'address' | 'manual'
+    geolocation_accuracy?: number
   }): Promise<StorefrontSession> {
     return this.request<StorefrontSession>(`/storefront/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify(params) })
   }
@@ -362,6 +384,8 @@ export class WhaleClient {
     referral_code?: string
     loyalty_reward_id?: string
     selected_product_id?: string
+    visitor_id?: string
+    session_id?: string
   }): Promise<CheckoutSession> {
     return this.request<CheckoutSession>('/storefront/checkout', {
       method: 'POST',
