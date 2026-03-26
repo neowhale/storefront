@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { LandingSection } from '../../types.js'
-import { HeroSection, TextSection, ImageSection, VideoSection, GallerySection, SocialLinksSection, DividerSection } from './sections/content-sections.js'
+import { HeroSection, CollageHeroSection, TextSection, ImageSection, VideoSection, GallerySection, SocialLinksSection, DividerSection } from './sections/content-sections.js'
 import { CTASection, StatsSection, ProductCardSection, COAViewerSection, COAModal } from './sections/interactive-sections.js'
 import { LeadCaptureSection } from './sections/lead-capture-section.js'
+import { TestimonialsSection, ValueStackSection, FAQSection, TrustBadgesSection, CountdownSection } from './sections/conversion-sections.js'
 
 // Re-export types for external consumers
 export type { SectionTheme, ClickTrackingContext, SectionData } from './sections/shared.js'
@@ -31,6 +32,7 @@ export function SectionRenderer({
   const el = (() => {
     switch (section.type) {
       case 'hero': return <HeroSection section={section} theme={theme} tracking={tracking} onEvent={onEvent} />
+      case 'collage_hero': return <CollageHeroSection section={section} theme={theme} tracking={tracking} onEvent={onEvent} />
       case 'text': return <TextSection section={section} theme={theme} />
       case 'image': return <ImageSection section={section} theme={theme} />
       case 'video': return <VideoSection section={section} theme={theme} />
@@ -41,6 +43,11 @@ export function SectionRenderer({
       case 'coa_viewer': return <COAViewerSection section={section} data={data} theme={theme} onShowCOA={() => setShowCOA(true)} tracking={tracking} />
       case 'social_links': return <SocialLinksSection section={section} theme={theme} />
       case 'lead_capture': return <LeadCaptureSection section={section} data={data} theme={theme} onEvent={onEvent} />
+      case 'testimonials': return <TestimonialsSection section={section} theme={theme} />
+      case 'value_stack': return <ValueStackSection section={section} theme={theme} />
+      case 'faq': return <FAQSection section={section} theme={theme} />
+      case 'trust_badges': return <TrustBadgesSection section={section} theme={theme} />
+      case 'countdown': return <CountdownSection section={section} theme={theme} />
       case 'divider': return <DividerSection theme={theme} />
       default: return null
     }

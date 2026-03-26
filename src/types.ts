@@ -420,7 +420,7 @@ export interface QRLandingData {
 
 export interface LandingSection {
   id: string
-  type: 'hero' | 'text' | 'image' | 'video' | 'gallery' | 'cta' | 'stats' | 'product_card' | 'coa_viewer' | 'social_links' | 'divider' | 'lead_capture' | 'custom'
+  type: 'hero' | 'collage_hero' | 'text' | 'image' | 'video' | 'gallery' | 'cta' | 'stats' | 'product_card' | 'coa_viewer' | 'social_links' | 'divider' | 'lead_capture' | 'testimonials' | 'value_stack' | 'faq' | 'trust_badges' | 'countdown' | 'custom'
   content: Record<string, unknown>
   order: number
   config?: Record<string, unknown>
