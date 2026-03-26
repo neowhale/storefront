@@ -21,6 +21,7 @@ export function LeadCaptureSection({ section, data, theme, onEvent }: {
   const [newsletterOptIn, setNewsletterOptIn] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const [serverMessage, setServerMessage] = useState<{ heading: string; message: string } | null>(null)
 
   const gatewayUrl = c.gateway_url || data.gatewayUrl || 'https://whale-gateway.fly.dev'
   const storeId = c.store_id || data.store?.id
@@ -70,6 +71,16 @@ export function LeadCaptureSection({ section, data, theme, onEvent }: {
         throw new Error((body as { error?: { message?: string } })?.error?.message || 'Something went wrong. Please try again.')
       }
 
+      const body = await res.json().catch(() => ({})) as { is_new?: boolean; message?: string }
+
+      // Use server response to show contextual success message
+      if (body.is_new === false) {
+        setServerMessage({
+          heading: 'welcome back!',
+          message: body.message || 'your rewards are already loaded.',
+        })
+      }
+
       setStatus('success')
       onEvent?.('lead', { email, first_name: firstName || undefined, source: c.source || 'landing_page', landing_page_slug: slug || undefined })
     } catch (err) {
@@ -85,7 +96,7 @@ export function LeadCaptureSection({ section, data, theme, onEvent }: {
     transition: 'border-color 0.2s',
   }
 
-  if (status === 'success') return <SuccessState theme={theme} heading={successHeading} message={successMessage} couponCode={c.coupon_code} />
+  if (status === 'success') return <SuccessState theme={theme} heading={serverMessage?.heading || successHeading} message={serverMessage?.message || successMessage} couponCode={c.coupon_code} />
 
   return (
     <div style={{ padding: '3.5rem 1.5rem', maxWidth: 560, margin: '0 auto' }}>
